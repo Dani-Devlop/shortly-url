@@ -97,7 +97,7 @@ Run migrations against a real database with `alembic upgrade head`.
 ## 🧪 Tests
 
 ```bash
-pytest -v          # 24 tests, async SQLite + fakeredis, no services needed
+pytest -v          # 45 tests, async SQLite + fakeredis, no services needed
 ruff check .       # lint
 python scripts/load_test.py --base http://localhost:8000 --code <code> --total 1000 --concurrency 50
 ```

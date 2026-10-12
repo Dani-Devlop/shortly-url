@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: shortly-url-api
+    runtime: python
+    plan: free
+    region: frankfurt
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    # Apply migrations, then boot the API on Render's dynamic $PORT.
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: shortly-url-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: shortly-url-cache
+          property: connectionString
+      - key: ENVIRONMENT
+        value: production
+      # Public base URL used to build short_url values — set to your Render URL.
+      - key: BASE_URL
+        sync: false
+      # API key of the bootstrap "master" user — set in the Render dashboard.
+      - key: MASTER_API_KEY
+        sync: false
+      # Generated automatically on first deploy.
+      - key: IP_HASH_SALT
+        generateValue: true
+
+databases:
+  - name: shortly-url-db
+    plan: free
+    databaseName: shortly
+    user: shortly
+    ipAllowList: []  # internal connections only
+
+keyvalueInstances:
+  - name: shortly-url-cache
+    plan: free
+    maxmemoryPolicy: noeviction
+    ipAllowList: []  # internal connections only

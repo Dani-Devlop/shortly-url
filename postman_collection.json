@@ -1,0 +1,257 @@
+{
+  "info": {
+    "_postman_id": "b7e6a1c2-3f4d-4e5a-9b8c-1d2e3f4a5b6c",
+    "name": "shortly-url API",
+    "description": "Complete collection for the shortly-url link shortener.\n\nSet collection variables `baseUrl` and `apiKey` (Pre-request Scripts tab → Variables) and every request works against local (`http://localhost:8000`) or the live Render demo.\n\nThe **Shorten** request automatically stores the returned code in the `code` collection variable, so Redirect/Stats/Delete requests work right after it.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000" },
+    { "key": "apiKey", "value": "change-me-master-key" },
+    { "key": "code", "value": "aB3xK9m" }
+  ],
+  "item": [
+    {
+      "name": "Shorten URL",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.test('Response has code', () => pm.expect(body).to.have.property('code'));",
+              "pm.collectionVariables.set('code', body.code);",
+              "console.log('code saved to collection variable:', body.code);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-API-Key", "value": "{{apiKey}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"url\": \"https://example.com/some/very/long/path\",\n  \"custom_code\": null\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/shorten",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "shorten"]
+        },
+        "description": "Create a short link. Duplicate URLs from the same owner return the existing link. Optional `custom_code` must be 4–16 chars (letters/digits/-/_)."
+      }
+    },
+    {
+      "name": "Redirect (no follow)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 302 Found', () => pm.response.to.have.status(302));",
+              "pm.test('Location header present', () => pm.response.headers.get('Location') !== undefined);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/{{code}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{code}}"]
+        },
+        "description": "Follow the short link. Each call records a click asynchronously (background task)."
+      }
+    },
+    {
+      "name": "Stats — Total Clicks",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('total_clicks is a number', () => pm.expect(body.total_clicks).to.be.a('number'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/stats/{{code}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "stats", "{{code}}"]
+        }
+      }
+    },
+    {
+      "name": "Stats — Daily Clicks",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('items is an array', () => pm.expect(body.items).to.be.an('array'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/stats/{{code}}/daily?days=14",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "stats", "{{code}}", "daily"],
+          "query": [{ "key": "days", "value": "14", "description": "Rolling window: 1–90 days" }]
+        }
+      }
+    },
+    {
+      "name": "List My Links",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('Body is an array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/links?limit=50",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "links"],
+          "query": [{ "key": "limit", "value": "50" }]
+        }
+      }
+    },
+    {
+      "name": "Delete Link",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 204 No Content', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/links/{{code}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "links", "{{code}}"]
+        },
+        "description": "Deletes the link and its click rows; the cached redirect mapping is invalidated."
+      }
+    },
+    {
+      "name": "Health",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('database is up', () => pm.expect(body.database).to.eql(true));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "Auth — Missing API Key (expect 401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 401 Unauthorized', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"url\": \"https://example.com\" }"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/shorten",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "shorten"]
+        }
+      }
+    },
+    {
+      "name": "Validation — Invalid URL (expect 422)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 422 Unprocessable Entity', () => pm.response.to.have.status(422));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-API-Key", "value": "{{apiKey}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"url\": \"not-a-valid-url\" }"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/shorten",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "shorten"]
+        }
+      }
+    }
+  ]
+}
