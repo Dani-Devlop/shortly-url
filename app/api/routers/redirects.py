@@ -2,12 +2,11 @@
 
 import re
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError
-from app.db.session import get_db
+from app.db.session import get_session_factory
 from app.services.click_service import click_task
 from app.services.redirect_service import resolve_target
 
@@ -28,12 +27,15 @@ def _client_ip(request: Request) -> str | None:
 async def redirect_by_code(
     code: str,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
     if not CODE_PATTERN.match(code):
         raise NotFoundError(f"Short code '{code}' does not exist")
 
-    payload = await resolve_target(db, code)
+    # Short-lived explicit session: fully released *before* the response (and
+    # therefore the background click task) runs — no pool slot is held across
+    # the redirect.
+    async with get_session_factory()() as db:
+        payload = await resolve_target(db, code)
 
     return RedirectResponse(
         url=payload["url"],
