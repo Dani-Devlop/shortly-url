@@ -101,7 +101,23 @@
     .card:hover::after { opacity: .8; }
     .card .value { font-size: 1.9rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
     .card .value.amber { color: var(--amber); }
-    .card .label { color: var(--muted); font-size: .8rem; margin-top: .2rem; }
+    .card .label {
+      color: var(--muted); font-size: .8rem; margin-top: .3rem;
+      display: flex; align-items: center; gap: .5rem;
+    }
+    .icon-chip {
+      width: 30px; height: 30px; border-radius: 9px; display: inline-flex;
+      align-items: center; justify-content: center; flex-shrink: 0;
+      transition: transform .15s ease;
+    }
+    .card:hover .icon-chip { transform: scale(1.12) rotate(-4deg); }
+    .icon-chip svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .tint-emerald { background: var(--accent-soft); color: var(--accent); }
+    .tint-amber { background: var(--amber-soft); color: var(--amber); }
+    .tint-violet { background: rgba(124, 58, 237, .16); color: #a78bfa; }
+    .tint-rose { background: var(--danger-soft); color: var(--danger); }
+    .tint-slate { background: rgba(148, 163, 184, .14); color: var(--muted); }
+    .tint-teal { background: rgba(20, 184, 166, .14); color: #2dd4bf; }
     .trend-chip {
       display: inline-flex; align-items: center; gap: .25rem; margin-top: .4rem;
       font-size: .68rem; font-weight: 700; padding: .12rem .5rem; border-radius: 999px;
@@ -193,6 +209,14 @@
     .expiry-badge.live { background: var(--accent-soft); color: var(--accent); }
     .expiry-badge.soon { background: var(--amber-soft); color: var(--amber); }
     .expiry-badge.expired { background: var(--danger-soft); color: var(--danger); }
+    .utm-chip {
+      display: block; max-width: 128px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      margin-top: .22rem; font-size: .64rem; font-weight: 700; letter-spacing: .02em;
+      background: var(--violet-soft); color: #a78bfa;
+      border-radius: 999px; padding: .08rem .5rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    [data-theme="light"] .utm-chip { color: #7c3aed; }
     .actions { display: flex; gap: .3rem; }
     .icon-btn {
       display: inline-flex; align-items: center; justify-content: center;
@@ -205,6 +229,8 @@
     .icon-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .icon-btn.warm { color: var(--amber); border-color: var(--amber-soft); }
     .icon-btn.warm:hover { color: var(--amber); border-color: var(--amber); background: var(--amber-soft); }
+    .icon-btn.share:hover { color: #2dd4bf; border-color: #2dd4bf; background: rgba(20, 184, 166, .12); }
+    a.icon-btn { text-decoration: none; }
 
     ol.top-list { list-style: none; }
     ol.top-list li {
@@ -335,6 +361,22 @@
       50% { box-shadow: 0 0 0 4px var(--accent-soft); transform: scale(1.15); }
     }
     .autoref .count { font-variant-numeric: tabular-nums; opacity: .8; min-width: 1.4rem; text-align: left; }
+
+    /* ---- devices panel bots toggle ---- */
+    .bots-toggle {
+      margin-left: auto; font-size: .68rem; font-weight: 700; text-decoration: none;
+      color: var(--muted); border: 1px solid var(--border-strong); border-radius: 999px;
+      padding: .14rem .6rem; transition: all .15s ease; white-space: nowrap;
+    }
+    .bots-toggle:hover { border-color: var(--accent); color: var(--accent); }
+    .bots-toggle.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+    /* ---- QR size selector ---- */
+    .qr-size-row {
+      display: flex; align-items: center; justify-content: center; gap: .5rem;
+      font-size: .78rem; color: var(--muted);
+    }
+    .qr-size-row select { min-height: 36px; padding: .3rem .6rem; font-size: .8rem; }
 
     /* ---- stacked right column (top links + devices + activity) ---- */
     .stack { display: flex; flex-direction: column; gap: 1rem; }
@@ -493,11 +535,11 @@
     <section class="panel error">{{ error }}</section>
   {% else %}
     <section class="cards" aria-label="Summary">
-      <div class="card"><div class="value" data-countup="{{ summary.total_links }}">0</div><div class="label">Short links</div></div>
-      <div class="card"><div class="value amber" data-countup="{{ summary.total_clicks }}">0</div><div class="label">Total clicks</div></div>
-      <div class="card"><div class="value" data-countup="{{ summary.clicks_7d }}">0</div><div class="label">Clicks · last {{ spark_days }}d</div>{% if trend %}<span class="trend-chip {{ trend.direction }}" title="{{ trend.title }}">{{ '▲' if trend.direction == 'up' else ('▼' if trend.direction == 'down' else '▬') }} {{ trend.pct }} <span class="vs">vs prev 7d</span></span>{% endif %}</div>
-      <div class="card"><div class="value" data-countup="{{ unique_visitors }}">0</div><div class="label">Unique visitors</div></div>
-      <div class="card"><div class="value">{{ summary.avg_clicks }}</div><div class="label">Avg clicks / link</div></div>
+      <div class="card"><div class="value" data-countup="{{ summary.total_links }}">0</div><div class="label"><span class="icon-chip tint-emerald"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span>Short links</div></div>
+      <div class="card"><div class="value amber" data-countup="{{ summary.total_clicks }}">0</div><div class="label"><span class="icon-chip tint-amber"><svg viewBox="0 0 24 24"><path d="M9 9l5 12 1.8-5.2L21 14z"/><path d="M7.2 2.2 8 5.1m-5.9-.9 2.1 2.1M.9 10.8l2.9.8"/><path d="M7.5 7.5 12 12"/></svg></span>Total clicks</div></div>
+      <div class="card"><div class="value" data-countup="{{ summary.clicks_7d }}">0</div><div class="label"><span class="icon-chip tint-violet"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></span>Clicks · last {{ spark_days }}d</div>{% if trend %}<span class="trend-chip {{ trend.direction }}" title="{{ trend.title }}">{{ '▲' if trend.direction == 'up' else ('▼' if trend.direction == 'down' else '▬') }} {{ trend.pct }} <span class="vs">vs prev 7d</span></span>{% endif %}</div>
+      <div class="card"><div class="value" data-countup="{{ unique_visitors }}">0</div><div class="label"><span class="icon-chip tint-teal"><svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/><path d="M16 3.1a4 4 0 0 1 0 7.8"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/></svg></span>Unique visitors</div></div>
+      <div class="card"><div class="value">{{ summary.avg_clicks }}</div><div class="label"><span class="icon-chip tint-slate"><svg viewBox="0 0 24 24"><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/><circle cx="12" cy="12" r="9"/><path d="m12 12 4-4"/></svg></span>Avg clicks / link</div></div>
     </section>
 
     <section class="grid-2">
@@ -516,9 +558,10 @@
             <li><span class="method get">GET</span><code>/api/stats/{code}</code><span class="desc">total clicks</span></li>
             <li><span class="method get">GET</span><code>/api/stats/{code}/daily</code><span class="desc">per-day series</span></li>
             <li><span class="method get">GET</span><code>/api/stats/{code}/referrers?days</code><span class="desc">sources in window</span></li>
-            <li><span class="method get">GET</span><code>/api/stats/devices?days</code><span class="desc">device mix</span></li>
+            <li><span class="method get">GET</span><code>/api/stats/devices?days</code><span class="desc">device mix · &amp;exclude_bots</span></li>
             <li><span class="method get">GET</span><code>/{code}</code><span class="desc">redirect 302</span></li>
-            <li><span class="method get">GET</span><code>/{code}/qr?format=svg|png</code><span class="desc">QR code</span></li>
+            <li><span class="method get">GET</span><code>/{code}/qr?format=svg|png&size</code><span class="desc">QR code · 64–1024 px</span></li>
+            <li><span class="method get">GET</span><code>/s/{code}</code><span class="desc">public stats page</span></li>
             <li><span class="method del">DELETE</span><code>/api/links/{code}</code><span class="desc">remove link</span></li>
           </ul>
           <p class="note" style="margin-top:.6rem">With Redis on, <code class="inline">POST /api/shorten</code> answers with <code class="inline">X-RateLimit-*</code> headers and <code class="inline">Retry-After</code> on 429.</p>
@@ -540,7 +583,10 @@
           </ol>
         </div>
         <div class="panel">
-          <h2>📱 Devices <span class="hint">last {{ device_days }}d · {{ devices_total }} click{{ 's' if devices_total != 1 }}</span></h2>
+          <h2>📱 Devices <span class="hint">last {{ device_days }}d · {{ devices_total }} click{{ 's' if devices_total != 1 }}</span>
+            <a class="bots-toggle {{ 'on' if not bots else '' }}" href="/?sort={{ sort }}&per_page={{ per_page }}&bots={{ 0 if bots else 1 }}"
+               title="{{ 'Show crawler traffic in the mix' if bots else 'Hide crawler traffic from the mix' }}">🤖 {{ 'bots on' if bots else 'bots hidden' }}</a>
+          </h2>
           {% if devices %}
             <div class="dev-bar" role="img" aria-label="Device mix for the last {{ device_days }} days">
               {% for d in devices %}
@@ -608,6 +654,7 @@
             <input id="newUrl" placeholder="https://example.com/destination" style="flex:1; min-width:220px">
             <button type="button" id="createBtn">⚡ Shorten</button>
           </div>
+          <input id="newUtm" placeholder="UTM template (optional) — utm_source=newsletter&utm_campaign=launch" autocomplete="off" spellcheck="false" style="margin-top:.45rem">
         </div>
         <div class="field">
           <span for="bulkUrls">Bulk create <span class="muted">(one URL per line, max 25)</span></span>
@@ -663,7 +710,10 @@
           <tbody>
             {% for l in links %}
               <tr data-code="{{ l.code }}" data-url="{{ l.original_url|lower }}" style="--i: {{ loop.index0 }}">
-                <td><a href="/{{ l.code }}" target="_blank" rel="noopener noreferrer">{{ l.code }}</a></td>
+                <td>
+                  <a href="/{{ l.code }}" target="_blank" rel="noopener noreferrer">{{ l.code }}</a>
+                  {% if l.utm %}<span class="utm-chip" title="UTM template: {{ l.utm }} — default params appended on redirect">📣 {{ l.utm }}</span>{% endif %}
+                </td>
                 <td class="url-cell" title="{{ l.original_url }}">
                   <a href="{{ l.original_url }}" target="_blank" rel="noopener noreferrer">{{ l.original_url_display }}</a>
                 </td>
@@ -682,13 +732,16 @@
                     <button class="icon-btn" title="Copy short URL" aria-label="Copy short URL for {{ l.code }}" onclick="copyUrl('{{ l.short_url }}', this)">
                       <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     </button>
+                    <a class="icon-btn share" href="/s/{{ l.code }}" target="_blank" rel="noopener noreferrer" title="Open the public stats page" aria-label="Public stats page for {{ l.code }}">
+                      <svg viewBox="0 0 24 24"><path d="M12.5.5h11v11"/><path d="m7 17 16.5-16.5"/><path d="M17 11v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h9"/></svg>
+                    </a>
                     <button class="icon-btn" title="Insights &amp; recent clicks" aria-label="Insights for {{ l.code }}" onclick="openDetail('{{ l.code }}')">
                       <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15v-4m5 4V7m5 12v-7"/></svg>
                     </button>
                     <button class="icon-btn" title="QR code" aria-label="QR code for {{ l.code }}" onclick="openQr('{{ l.code }}', '{{ l.short_url }}')">
                       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM21 14v7h-7v-3"/></svg>
                     </button>
-                    <button class="icon-btn warm admin-only" title="Edit destination / expiry" aria-label="Edit {{ l.code }}" onclick="openEdit('{{ l.code }}', this)">
+                    <button class="icon-btn warm admin-only" title="Edit destination / expiry / UTM" aria-label="Edit {{ l.code }}" onclick="openEdit('{{ l.code }}', this)">
                       <svg viewBox="0 0 24 24"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
                     </button>
                     <button class="icon-btn danger admin-only" title="Delete link" aria-label="Delete {{ l.code }}" onclick="askDelete('{{ l.code }}')">
@@ -756,6 +809,11 @@
       <input id="editExpiry" type="datetime-local">
       <label class="checkbox-row"><input id="editNoExpiry" type="checkbox"> No expiry (clears any set expiry)</label>
     </div>
+    <div class="field">
+      <span for="editUtm">UTM template (optional)</span>
+      <input id="editUtm" placeholder="utm_source=newsletter&utm_campaign=launch" autocomplete="off" spellcheck="false">
+      <span class="note">Default campaign params appended on every redirect — explicit short-URL params win.</span>
+    </div>
   </div>
   <div class="dlg-foot">
     <button type="button" class="ghost" onclick="editDlg.close()">Cancel</button>
@@ -807,6 +865,15 @@
   <div class="dlg-body">
     <div class="qr-holder"><img id="qrImg" alt="QR code" width="200" height="200"></div>
     <p class="dlg-dest" id="qrTarget" style="text-align:center; word-break:break-all"></p>
+    <div class="qr-size-row">
+      <span for="qrSize">Size</span>
+      <select id="qrSize" aria-label="QR code image size">
+        <option value="128">128 px</option>
+        <option value="256" selected>256 px</option>
+        <option value="512">512 px</option>
+        <option value="1024">1024 px</option>
+      </select>
+    </div>
     <div class="row" style="justify-content:center">
       <button type="button" id="qrCopyBtn" class="ghost">⧉ Copy link</button>
       <a id="qrDownload" class="btn" download>⬇ Download PNG</a>
@@ -901,11 +968,14 @@
     const key = requireKey(); if (!key) return;
     const url = $('#newUrl').value.trim();
     if (!url) { showToast('Enter a destination URL', true); return; }
+    const utm = $('#newUtm') ? $('#newUtm').value.trim() : '';
     try {
-      const res = await fetch('/api/shorten', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ url }) });
-      const body = await res.json();
-      if (res.status === 201) { showToast('Created ' + body.code, false, '⚡'); $('#newUrl').value = ''; setTimeout(() => location.reload(), 900); }
-      else showToast((body.error && body.error.message) || ('Failed: ' + res.status), true);
+      const body = { url };
+      if (utm) body.utm_template = utm;
+      const res = await fetch('/api/shorten', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
+      const data = await res.json();
+      if (res.status === 201) { showToast('Created ' + data.code, false, '⚡'); $('#newUrl').value = ''; if ($('#newUtm')) $('#newUtm').value = ''; setTimeout(() => location.reload(), 900); }
+      else showToast((data.error && data.error.message) || ('Failed: ' + res.status), true);
     } catch { showToast('Network error', true); }
   }
 
@@ -943,13 +1013,15 @@
     $('#editUrl').value = btn ? (btn.closest('tr')?.querySelector('.url-cell a')?.href || '') : '';
     $('#editExpiry').value = '';
     $('#editNoExpiry').checked = false;
-    // Pre-fill the current expiry from the API (best effort).
+    $('#editUtm').value = '';
+    // Pre-fill current values from the API (best effort).
     fetch('/api/links/' + encodeURIComponent(code), { headers: { 'X-API-Key': key } })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!data) return;
         if (!$('#editUrl').value) $('#editUrl').value = data.original_url || '';
         if (data.expires_at) $('#editExpiry').value = toLocalInput(data.expires_at);
+        if (data.utm_template) $('#editUtm').value = data.utm_template;
       });
     editDlg.showModal();
   }
@@ -958,7 +1030,7 @@
     const code = $('#editCode').value.trim();
     const url = $('#editUrl').value.trim();
     if (!url) { showToast('Destination URL is required', true); return; }
-    const payload = { url };
+    const payload = { url, utm_template: $('#editUtm').value.trim() || null };
     if ($('#editNoExpiry').checked) payload.expires_at = null;
     else if ($('#editExpiry').value) payload.expires_at = new Date($('#editExpiry').value).toISOString();
     try {
@@ -1005,17 +1077,25 @@
 
   /* ---- QR dialog ---- */
   let qrCurrentUrl = '';
+  let qrCurrentCode = '';
+  function applyQrSize() {
+    const size = $('#qrSize').value;
+    const src = '/' + encodeURIComponent(qrCurrentCode) + '/qr?format=png&size=' + size;
+    $('#qrImg').src = src;
+    $('#qrDownload').href = src;
+    $('#qrOpen').href = '/' + encodeURIComponent(qrCurrentCode) + '/qr?format=svg&size=' + size;
+  }
   function openQr(code, shortUrl) {
     qrCurrentUrl = shortUrl;
+    qrCurrentCode = code;
     $('#qrDlgTitle').textContent = 'QR · ' + code;
-    $('#qrImg').src = '/' + encodeURIComponent(code) + '/qr?format=png';
     $('#qrTarget').textContent = shortUrl;
-    $('#qrDownload').href = '/' + encodeURIComponent(code) + '/qr?format=png';
     $('#qrDownload').setAttribute('download', code + '-qr.png');
-    $('#qrOpen').href = '/' + encodeURIComponent(code) + '/qr';
+    applyQrSize();
     qrDlg.showModal();
   }
   $('#qrCopyBtn') && $('#qrCopyBtn').addEventListener('click', () => copyUrl(qrCurrentUrl));
+  $('#qrSize') && $('#qrSize').addEventListener('change', applyQrSize);
 
   /* ---- referrer helpers ---- */
   function escapeHtml(s) {

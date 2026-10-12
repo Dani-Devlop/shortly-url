@@ -61,6 +61,7 @@ def _to_out(link: Link, total_clicks: int) -> LinkOut:
         original_url=link.original_url,
         created_at=link.created_at,
         expires_at=link.expires_at,
+        utm_template=link.utm_template,
         total_clicks=total_clicks,
     )
 
@@ -83,6 +84,7 @@ async def shorten(
         owner_id=user.id,
         custom_code=payload.custom_code,
         expires_at=payload.expires_at,
+        utm_template=payload.utm_template,
     )
     out = _to_out(link, await get_total_clicks(db, link))
     response.headers["Location"] = out.short_url
@@ -271,6 +273,7 @@ async def link_detail(
         original_url=link.original_url,
         created_at=link.created_at,
         expires_at=link.expires_at,
+        utm_template=link.utm_template,
         total_clicks=await get_total_clicks(db, link),
         unique_clicks=await count_unique_clicks(db, link.id),
         recent_clicks=recent,
@@ -287,9 +290,10 @@ async def update_link_fields(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> LinkOut:
-    """Update a link's destination and/or expiry (cache is invalidated).
+    """Update a link's destination, expiry and/or UTM template (cache is invalidated).
 
-    Send ``{"expires_at": null}`` to remove an expiry.
+    Send ``{"expires_at": null}`` to remove an expiry or ``{"utm_template": null}``
+    to clear the campaign template.
     """
     link = await _owned_link(db, code, user)
     provided = payload.model_fields_set
@@ -297,7 +301,10 @@ async def update_link_fields(
     expiry = (
         payload.expires_at if "expires_at" in provided else LinkExpiryUnset()
     )
-    link = await update_link(db, link, new_url=new_url, expires_at=expiry)
+    utm = payload.utm_template if "utm_template" in provided else LinkExpiryUnset()
+    link = await update_link(
+        db, link, new_url=new_url, expires_at=expiry, utm_template=utm
+    )
     return _to_out(link, await get_total_clicks(db, link))
 
 

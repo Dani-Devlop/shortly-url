@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="robots" content="noindex">
+  <title>{% if link %}{{ link.code }} · stats{% else %}shortly-url · not found{% endif %}</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <style>
+    :root {
+      --bg: #0f172a; --bg-soft: #131f38; --card: #1e293b;
+      --accent: #34d399; --accent-strong: #10b981; --accent-ink: #052e1a;
+      --accent-soft: rgba(52, 211, 153, .12);
+      --amber: #fbbf24; --amber-soft: rgba(251, 191, 36, .12);
+      --violet: #a78bfa; --violet-soft: rgba(124, 58, 237, .16);
+      --danger: #f87171; --danger-soft: rgba(248, 113, 113, .1);
+      --text: #e2e8f0; --muted: #94a3b8;
+      --border: rgba(148, 163, 184, .15); --border-strong: rgba(148, 163, 184, .3);
+      --radius: 12px; --radius-sm: 8px;
+      --shadow: 0 8px 24px rgba(2, 6, 23, .45);
+      --hero-glow: radial-gradient(1200px 500px at 50% -10%, #1b2a4a 0%, var(--bg) 55%);
+      --spark-line: var(--accent);
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f2f6fc; --bg-soft: #e8eef8; --card: #ffffff;
+        --accent: #0d9f6e; --accent-strong: #059669; --accent-ink: #ffffff;
+        --accent-soft: rgba(13, 159, 110, .1);
+        --amber: #b45309; --amber-soft: rgba(180, 83, 9, .1);
+        --violet: #7c3aed; --violet-soft: rgba(124, 58, 237, .12);
+        --danger: #dc2626; --danger-soft: rgba(220, 38, 38, .08);
+        --text: #0f172a; --muted: #5b6b83;
+        --border: rgba(15, 23, 42, .12); --border-strong: rgba(15, 23, 42, .24);
+        --shadow: 0 8px 24px rgba(15, 23, 42, .1);
+        --hero-glow: radial-gradient(1200px 500px at 50% -10%, #dce9fb 0%, var(--bg) 55%);
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--hero-glow) fixed, var(--bg); color: var(--text);
+      min-height: 100vh; display: flex; flex-direction: column;
+    }
+    header {
+      padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: .5rem;
+    }
+    .logo { font-size: 1.15rem; font-weight: 700; text-decoration: none; color: var(--text); }
+    .logo span { color: var(--accent); }
+    .pill {
+      background: var(--accent-soft); color: var(--accent); font-weight: 600;
+      border-radius: 999px; padding: .18rem .65rem; font-size: .75rem; white-space: nowrap;
+    }
+    main { flex: 1; width: 100%; max-width: 880px; margin: 0 auto; padding: 1.75rem 1rem 2.5rem; }
+    .hero {
+      background: linear-gradient(160deg, var(--card) 0%, var(--bg-soft) 100%);
+      border: 1px solid var(--border); border-radius: var(--radius); padding: 1.4rem 1.5rem;
+      box-shadow: var(--shadow); margin-bottom: 1rem;
+    }
+    .hero .code {
+      font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; color: var(--accent);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all;
+    }
+    .hero .dest { color: var(--muted); font-size: .9rem; margin-top: .3rem; word-break: break-all; }
+    .hero .dest a { color: var(--muted); text-decoration: underline; text-decoration-color: var(--border-strong); }
+    .hero .dest a:hover { color: var(--accent); }
+    .hero .meta { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-top: .8rem; }
+    .meta-chip {
+      display: inline-flex; align-items: center; gap: .35rem; font-size: .74rem; font-weight: 600;
+      background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: .16rem .6rem;
+    }
+    .meta-chip.warn { background: var(--amber-soft); color: var(--amber); }
+    .meta-chip.bad { background: var(--danger-soft); color: var(--danger); }
+    .meta-chip.campaign { background: var(--violet-soft); color: var(--violet); max-width: 100%; }
+    .meta-chip .k { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; opacity: .85; overflow: hidden; text-overflow: ellipsis; }
+    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+    @media (max-width: 560px) { .cards { grid-template-columns: 1fr 1fr; } }
+    .stat {
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.05rem 1.2rem; box-shadow: var(--shadow); position: relative; overflow: hidden;
+    }
+    .stat::after {
+      content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0; transition: opacity .2s ease;
+    }
+    .stat:hover::after { opacity: .8; }
+    .stat .value { font-size: 2rem; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+    .stat .label { color: var(--muted); font-size: .8rem; margin-top: .15rem; }
+    .panel {
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.1rem 1.25rem; box-shadow: var(--shadow); margin-bottom: 1rem;
+    }
+    h2 { font-size: .95rem; font-weight: 700; margin-bottom: .75rem; display: flex; align-items: center; gap: .5rem; }
+    h2 .hint { color: var(--muted); font-weight: 400; font-size: .78rem; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+    @media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .chart { display: flex; align-items: stretch; gap: 4px; height: 130px; padding-top: .4rem; }
+    .pcol { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; min-width: 6px; }
+    .pbar {
+      width: 100%; display: block; border-radius: 4px 4px 2px 2px;
+      background: linear-gradient(180deg, var(--accent-strong), var(--accent));
+      opacity: .9; transition: opacity .15s ease, filter .15s ease; min-height: 3px;
+    }
+    .pbar.pbar-zero { height: 2px !important; background: var(--border); opacity: 1; }
+    .pcol:hover .pbar { opacity: 1; filter: brightness(1.15); }
+    .chart-axis { display: flex; justify-content: space-between; color: var(--muted); font-size: .68rem; margin-top: .4rem; }
+
+    .dev-bar {
+      display: flex; height: 12px; border-radius: 8px; overflow: hidden;
+      background: var(--border); margin: .35rem 0 .7rem; box-shadow: inset 0 0 0 1px var(--border);
+    }
+    .dev-seg { height: 100%; }
+    .dev-seg + .dev-seg { box-shadow: -1px 0 0 rgba(0,0,0,.25); }
+    .dev-desktop { background: linear-gradient(90deg, var(--accent-strong), var(--accent)); }
+    .dev-mobile  { background: linear-gradient(90deg, #d97706, #fbbf24); }
+    .dev-tablet  { background: linear-gradient(90deg, #7c3aed, #a78bfa); }
+    .dev-bot     { background: linear-gradient(90deg, #e11d48, #fb7185); }
+    .dev-other   { background: linear-gradient(90deg, #475569, #94a3b8); }
+    .dev-legend { list-style: none; }
+    .dev-legend li {
+      display: flex; align-items: center; gap: .55rem; padding: .4rem 0;
+      border-bottom: 1px dashed var(--border); font-size: .8rem;
+    }
+    .dev-legend li:last-child { border-bottom: 0; }
+    .dev-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+    .dev-dot.dev-desktop { background: var(--accent); }
+    .dev-dot.dev-mobile { background: #fbbf24; }
+    .dev-dot.dev-tablet { background: #a78bfa; }
+    .dev-dot.dev-bot { background: #fb7185; }
+    .dev-dot.dev-other { background: #94a3b8; }
+    .dev-name { font-weight: 600; text-transform: capitalize; }
+    .dev-legend .pct { color: var(--muted); font-size: .72rem; margin-left: auto; }
+    .dev-legend .count { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    .ref-chips { display: flex; flex-direction: column; gap: .45rem; }
+    .ref-chip { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .6rem; font-size: .8rem; }
+    .ref-chip .ref-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ref-chip .host { color: var(--accent); font-weight: 600; }
+    .ref-chip .ref-bar-wrap { grid-column: 1 / -1; height: 4px; border-radius: 4px; background: var(--border); overflow: hidden; }
+    .ref-chip .ref-bar { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent-strong), var(--accent)); min-width: 3px; }
+    .ref-chip .ref-count { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    .act-list { list-style: none; }
+    .act-row {
+      display: flex; align-items: center; gap: .5rem; padding: .45rem .15rem;
+      border-bottom: 1px dashed var(--border); font-size: .82rem;
+    }
+    .act-row:last-child { border-bottom: 0; }
+    .act-ref { flex: 1; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .act-ref em { opacity: .7; }
+    .act-time { color: var(--muted); font-size: .72rem; white-space: nowrap; }
+    .note { color: var(--muted); font-size: .8rem; }
+    .muted { color: var(--muted); }
+
+    .qr-holder {
+      display: grid; place-items: center; padding: .8rem; border: 1px dashed var(--border-strong);
+      border-radius: var(--radius-sm); background: #fff; width: fit-content; margin: 0 auto;
+    }
+    .qr-holder img { width: 150px; height: 150px; display: block; image-rendering: pixelated; }
+    .qr-note { text-align: center; color: var(--muted); font-size: .72rem; margin-top: .5rem; }
+
+    .big-empty { text-align: center; padding: 4rem 1rem; }
+    .big-empty .icon { font-size: 2.6rem; }
+    .big-empty h1 { font-size: 1.2rem; margin: .8rem 0 .4rem; }
+    .big-empty p { color: var(--muted); font-size: .9rem; }
+
+    footer {
+      margin-top: auto; padding: 1rem; text-align: center; color: var(--muted); font-size: .78rem;
+      border-top: 1px solid var(--border); padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    footer .foot-inner { display: flex; justify-content: center; align-items: center; gap: .5rem; flex-wrap: wrap; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <a class="logo" href="/">shortly<span>-url</span> ⚡</a>
+  <div class="pill">public stats</div>
+</header>
+
+<main>
+  {% if not_found %}
+    <div class="big-empty panel">
+      <div class="icon">🕳️</div>
+      <h1>Stats not found</h1>
+      <p>No short link exists for this code.<br>Double-check the URL — codes are case-sensitive.</p>
+      <p style="margin-top:1.2rem"><a class="pill" href="/" style="text-decoration:none">← Back to the dashboard</a></p>
+    </div>
+  {% elif error %}
+    <div class="panel"><h2>⚠️ Something went wrong</h2><p class="note">{{ error }}</p></div>
+  {% elif link %}
+    <section class="hero">
+      <div class="code">{{ link.code }}</div>
+      <p class="dest">→ <a href="{{ link.original_url }}" target="_blank" rel="noopener noreferrer nofollow">{{ link.original_url }}</a></p>
+      <div class="meta">
+        <span class="meta-chip" title="Short URL">🔗 {{ link.short_url }}</span>
+        <span class="meta-chip" title="Created">📅 {{ link.created_abs }}</span>
+        {% if link.expiry %}
+          <span class="meta-chip {{ 'bad' if link.expiry.state == 'expired' else ('warn' if link.expiry.state == 'soon' else '') }}" title="{{ link.expiry.abs }}">
+            ⏳ {{ link.expiry.label }}</span>
+        {% endif %}
+        {% if link.utm %}<span class="meta-chip campaign" title="{{ link.utm }}">📣 <span class="k">{{ link.utm }}</span></span>{% endif %}
+        <span class="meta-chip" title="Shareable stats URL — copy and send this page's address">📊 {{ stats_url }}</span>
+      </div>
+    </section>
+
+    <section class="cards">
+      <div class="stat"><div class="value">{{ total_clicks }}</div><div class="label">Total clicks</div></div>
+      <div class="stat"><div class="value">{{ unique_clicks }}</div><div class="label">Unique visitors</div></div>
+    </section>
+
+    <section class="panel">
+      <h2>📈 Clicks · last {{ chart_days }} days</h2>
+      {% if bars %}
+        <div class="chart" role="img" aria-label="Daily clicks for the last {{ chart_days }} days">
+          {% for b in bars %}
+            <span class="pcol" title="{{ b.date }}: {{ b.clicks }} click{{ 's' if b.clicks != 1 }}">
+              {% if b.clicks > 0 %}<span class="pbar" style="height: {{ b.pct }}%"></span>{% else %}<span class="pbar pbar-zero"></span>{% endif %}
+            </span>
+          {% endfor %}
+        </div>
+        <div class="chart-axis"><span>{{ bars[0].date }}</span><span>today</span></div>
+      {% else %}
+        <p class="note">No clicks recorded yet.</p>
+      {% endif %}
+    </section>
+
+    <section class="grid-2">
+      <div class="panel">
+        <h2>📱 Devices <span class="hint">all time</span></h2>
+        {% if devices %}
+          <div class="dev-bar" role="img" aria-label="Device mix, all time">
+            {% for d in devices %}
+              <span class="dev-seg dev-{{ d.device }}" style="width: {{ d.pct }}%" title="{{ d.device }}: {{ d.clicks }} ({{ d.pct }}%)"></span>
+            {% endfor %}
+          </div>
+          <ul class="dev-legend">
+            {% for d in devices %}
+              <li><span class="dev-dot dev-{{ d.device }}"></span><span class="dev-name">{{ d.device }}</span>
+                <span class="pct">{{ d.pct }}%</span><span class="count">{{ d.clicks }}</span></li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="note">No device data yet.</p>
+        {% endif %}
+      </div>
+      <div class="panel">
+        <h2>🛰 Top sources <span class="hint">all time</span></h2>
+        {% if referrers %}
+          <div class="ref-chips">
+            {% for r in referrers %}
+              <div class="ref-chip">
+                <span class="ref-name" title="{{ r.source }}">
+                  {% if r.source == 'direct' %}<span class="host">direct</span>{% else %}<span class="host">{{ r.host }}</span>{% endif %}
+                </span>
+                <span class="ref-count">{{ r.clicks }}</span>
+                <span class="ref-bar-wrap"><span class="ref-bar" style="width: {{ [r.clicks * 100 / referrers[0].clicks, 4] | max | round(0, 'floor') | int }}%"></span></span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="note">No traffic recorded yet.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="grid-2" style="margin-top:1rem">
+      <div class="panel">
+        <h2>🕘 Recent clicks <span class="hint">newest {{ recent | length }}</span></h2>
+        {% if recent %}
+          <ul class="act-list">
+            {% for c in recent %}
+              <li class="act-row">
+                <span class="dev-dot dev-{{ c.device }}" title="{{ c.device }}"></span>
+                <span class="act-ref">{% if c.referrer_host %}{{ c.referrer_host }}{% else %}<em>direct</em>{% endif %}</span>
+                <span class="act-time" title="{{ c.when_abs }}">{{ c.when }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="note">No clicks recorded yet.</p>
+        {% endif %}
+      </div>
+      <div class="panel">
+        <h2>📦 QR code</h2>
+        <div class="qr-holder"><img src="/{{ link.code }}/qr?format=png&size=300" alt="QR code for {{ link.code }}" width="150" height="150"></div>
+        <p class="qr-note">scan to open <span class="muted">{{ link.short_url }}</span></p>
+      </div>
+    </section>
+  {% endif %}
+</main>
+
+<footer>
+  <div class="foot-inner">
+    <span>shortly-url</span><span class="pill">v{{ version }}</span>
+    <span>· shareable link analytics ·</span>
+    <a href="/">Dashboard</a>·
+    <a href="https://github.com/Dani-Devlop/shortly-url" target="_blank" rel="noopener noreferrer">GitHub</a>
+  </div>
+</footer>
+</body>
+</html>

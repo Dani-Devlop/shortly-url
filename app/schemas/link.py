@@ -4,6 +4,8 @@ from datetime import UTC, date, datetime, timedelta
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
+from app.core.utm import normalize_utm_template
+
 
 def _ensure_future(value: datetime | None) -> datetime | None:
     """Reject expiry timestamps that are already in the past (1s clock slack)."""
@@ -34,10 +36,23 @@ class ShortenRequest(BaseModel):
         default=None,
         description="Optional expiry timestamp (ISO 8601). Expired links return 410 Gone.",
     )
+    utm_template: str | None = Field(
+        default=None,
+        max_length=512,
+        examples=["utm_source=newsletter&utm_campaign=launch"],
+        description=(
+            "Optional default UTM query params appended on redirect. Explicit "
+            "params on the short URL and on the destination take precedence."
+        ),
+    )
 
     @model_validator(mode="after")
-    def _validate_expiry(self) -> "ShortenRequest":
+    def _validate(self) -> "ShortenRequest":
         self.expires_at = _ensure_future(self.expires_at)
+        try:
+            self.utm_template = normalize_utm_template(self.utm_template)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from None
         return self
 
 
@@ -75,6 +90,10 @@ class LinkOut(BaseModel):
     original_url: str
     created_at: datetime
     expires_at: datetime | None = None
+    utm_template: str | None = Field(
+        default=None,
+        description="Default UTM params appended on redirect (campaign template).",
+    )
     total_clicks: int = 0
 
 
@@ -111,16 +130,26 @@ class LinkUpdate(BaseModel):
         default=None,
         description="New expiry timestamp. Send null to remove the expiry."
     )
+    utm_template: str | None = Field(
+        default=None,
+        max_length=512,
+        description="New UTM template. Send null to clear it.",
+    )
 
     @model_validator(mode="after")
     def _validate(self) -> "LinkUpdate":
         provided = self.model_fields_set
         if "url" in provided and self.url is None:
             raise ValueError("url cannot be null")
-        if not provided & {"url", "expires_at"}:
-            raise ValueError("provide at least one of 'url' or 'expires_at'")
+        if not provided & {"url", "expires_at", "utm_template"}:
+            raise ValueError("provide at least one of 'url', 'expires_at' or 'utm_template'")
         if "expires_at" in provided:
             self.expires_at = _ensure_future(self.expires_at)
+        if "utm_template" in provided:
+            try:
+                self.utm_template = normalize_utm_template(self.utm_template)
+            except ValueError as exc:
+                raise ValueError(str(exc)) from None
         return self
 
 

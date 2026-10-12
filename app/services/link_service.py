@@ -63,11 +63,13 @@ async def _generate_unique_code(db: AsyncSession) -> str:
 
 
 def _cache_payload(link: Link) -> dict:
-    """Redis cache shape for a link. ``exp`` is an ISO string or None."""
+    """Redis cache shape for a link. ``exp`` is an ISO string or None;
+    ``utm`` carries the campaign template applied at redirect time."""
     return {
         "url": link.original_url,
         "id": link.id,
         "exp": link.expires_at.isoformat() if link.expires_at else None,
+        "utm": link.utm_template,
     }
 
 
@@ -78,6 +80,7 @@ async def create_link(
     owner_id: int,
     custom_code: str | None = None,
     expires_at: datetime | None = None,
+    utm_template: str | None = None,
 ) -> Link:
     """Create a link. Duplicate URLs from the same owner return the existing link."""
     validate_target_url(original_url)
@@ -97,7 +100,13 @@ async def create_link(
     else:
         code = await _generate_unique_code(db)
 
-    link = Link(code=code, original_url=original_url, owner_id=owner_id, expires_at=expires_at)
+    link = Link(
+        code=code,
+        original_url=original_url,
+        owner_id=owner_id,
+        expires_at=expires_at,
+        utm_template=utm_template,
+    )
     db.add(link)
     await db.commit()
     await db.refresh(link)
@@ -126,13 +135,14 @@ async def update_link(
     *,
     new_url: str | None = None,
     expires_at: datetime | None | LinkExpiryUnset = _UNSET,
+    utm_template: str | None | LinkExpiryUnset = _UNSET,
 ) -> Link:
-    """Update destination and/or expiry, then invalidate the link's cache.
+    """Update destination/expiry/UTM template, then invalidate the link's cache.
 
-    ``expires_at`` accepts:
-    - ``_UNSET`` (default): leave the expiry untouched
-    - ``None``: clear the expiry
-    - a datetime: set the expiry
+    ``expires_at`` and ``utm_template`` accept:
+    - ``_UNSET`` (default): leave the field untouched
+    - ``None``: clear the field
+    - a datetime / string: set the field
     """
     changed = False
     if new_url is not None:
@@ -143,6 +153,10 @@ async def update_link(
     if not isinstance(expires_at, LinkExpiryUnset):
         if link.expires_at != expires_at:
             link.expires_at = expires_at
+            changed = True
+    if not isinstance(utm_template, LinkExpiryUnset):
+        if link.utm_template != utm_template:
+            link.utm_template = utm_template
             changed = True
     if changed:
         db.add(link)

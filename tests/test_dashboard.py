@@ -162,3 +162,55 @@ async def test_dashboard_auto_refresh_toggle_present(client):
     assert 'id="autorefBtn"' in response.text
     assert "shortlyAutoRefresh" in response.text  # persistence wiring
     assert "dialog[open]" in response.text  # pause guard while modals are open
+
+
+async def test_dashboard_shows_campaign_chip_and_share_action(client):
+    """v1.6.0: UTM template chip on rows + public-stats share action."""
+    data = await shorten(
+        client,
+        url="https://example.com/campaigned",
+        utm_template="utm_source=newsletter&utm_campaign=launch",
+    )
+    plain = await shorten(client, url="https://example.com/no-campaign")
+    response = await client.get("/")
+    assert response.status_code == 200
+    body = response.text
+    # campaign chip rendered for the link with a template (title carries the full value)
+    assert 'utm-chip' in body
+    assert 'utm_source=newsletter&amp;utm_campaign=launch' in body
+    # no chip on the plain link row
+    plain_row = body.split(f'data-code="{plain["code"]}"')[1].split("</tr>")[0]
+    assert "utm-chip" not in plain_row
+    # public stats action links at /s/{code}
+    assert f'href="/s/{data["code"]}"' in body
+
+
+async def test_dashboard_bots_toggle_link(client):
+    response = await client.get("/")
+    assert response.status_code == 200
+    assert "bots-toggle" in response.text
+    assert "bots on" in response.text
+    hidden = await client.get("/", params={"bots": False})
+    assert hidden.status_code == 200
+    assert "bots hidden" in hidden.text
+
+
+async def test_dashboard_qr_size_selector_wired(client):
+    response = await client.get("/")
+    assert response.status_code == 200
+    assert 'id="qrSize"' in response.text
+    assert "applyQrSize" in response.text
+
+
+async def test_dashboard_utm_create_field_present(client):
+    response = await client.get("/")
+    assert response.status_code == 200
+    assert 'id="newUtm"' in response.text
+    assert 'id="editUtm"' in response.text
+
+
+async def test_public_stats_page_linked_from_api_reference(client):
+    response = await client.get("/")
+    assert response.status_code == 200
+    assert "/s/{code}" in response.text
+    assert "public stats page" in response.text

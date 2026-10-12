@@ -171,12 +171,16 @@ async def get_device_breakdown(db: AsyncSession, link: Link) -> list[tuple[str, 
 
 
 async def get_device_breakdown_global(
-    db: AsyncSession, days: int = 7, link_ids: list[int] | None = None
+    db: AsyncSession,
+    days: int = 7,
+    link_ids: list[int] | None = None,
+    exclude_bots: bool = False,
 ) -> tuple[list[tuple[str, int]], int]:
     """Device mix over a rolling window, optionally scoped to specific links.
 
-    Returns ``(items, total)`` where items cover every class present in the
-    window (``other`` included), ranked by clicks. A zero-click window yields
+    ``exclude_bots=True`` drops the crawler class from the breakdown. Returns
+    ``(items, total)`` where items cover every class present in the window
+    (``other`` included), ranked by clicks. A zero-click window yields
     ``([], 0)`` so the dashboard can show an empty state.
     """
     stmt = select(Click.device, func.count().label("clicks"))
@@ -184,6 +188,8 @@ async def get_device_breakdown_global(
         if not link_ids:
             return [], 0
         stmt = stmt.where(Click.link_id.in_(link_ids))
+    if exclude_bots:
+        stmt = stmt.where(Click.device != "bot")
     cutoff = datetime.now(UTC) - timedelta(days=days)
     rows = await db.execute(
         stmt.where(Click.clicked_at >= cutoff)

@@ -10,12 +10,13 @@ import qrcode.image.pil  # noqa: F401 — registers the PIL image factory
 import qrcode.image.svg
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import RedirectResponse, Response
+from PIL import Image
 
 from app.core.config import get_settings
 from app.core.exceptions import NotFoundError
 from app.db.session import get_session_factory
 from app.services.click_service import click_task
-from app.services.redirect_service import merge_query, resolve_target
+from app.services.redirect_service import apply_template, resolve_target
 
 router = APIRouter(tags=["redirect"])
 
@@ -44,9 +45,9 @@ async def redirect_by_code(
     async with get_session_factory()() as db:
         payload, cache_hit = await resolve_target(db, code)
 
-    # Query-param forwarding: /abc?utm_source=x redirects to the destination
-    # with utm_source=x appended (incoming wins over same-named params).
-    target = merge_query(payload["url"], request.url.query)
+    # Query-param forwarding + UTM template: the link's campaign params act as
+    # fallbacks; explicit short-URL params win, destination params beat the template.
+    target = apply_template(payload["url"], request.url.query, payload.get("utm"))
 
     return RedirectResponse(
         url=target,
@@ -70,10 +71,12 @@ async def redirect_by_code(
 async def qr_code(
     code: str,
     format: str = Query(default="svg", pattern="^(svg|png)$"),
+    size: int = Query(default=256, ge=64, le=1024, description="Image width/height in pixels (SVG and PNG)."),
 ) -> Response:
     """QR code pointing at the short URL (public, cacheable).
 
     ``format=svg`` (default) returns vector SVG; ``format=png`` a raster image.
+    ``size`` scales the rendered image (64–1024 px, default 256).
     """
     if not CODE_PATTERN.match(code):
         raise NotFoundError(f"Short code '{code}' does not exist")
@@ -87,10 +90,21 @@ async def qr_code(
     qr.make(fit=True)
     buffer = io.BytesIO()
     if format == "png":
-        qr.make_image(image_factory=qrcode.image.pil.PilImage).save(buffer, format="PNG")
+        image = qr.make_image(image_factory=qrcode.image.pil.PilImage).get_image()
+        resized = image.resize((size, size), Image.NEAREST)  # crisp modules, exact pixels
+        resized.save(buffer, format="PNG")
         media_type = "image/png"
     else:
-        qr.make_image(image_factory=qrcode.image.svg.SvgPathImage).save(buffer)
+        image = qr.make_image(image_factory=qrcode.image.svg.SvgPathImage)
+        svg_text = image.to_string().decode("utf-8")
+        # Normalise the root <svg> width/height to the requested size (px).
+        svg_text = re.sub(
+            r'(<svg[^>]*?)\swidth="[^"]*"\sheight="[^"]*"',
+            rf'\1 width="{size}" height="{size}"',
+            svg_text,
+            count=1,
+        )
+        buffer.write(svg_text.encode("utf-8"))
         media_type = "image/svg+xml"
 
     return Response(

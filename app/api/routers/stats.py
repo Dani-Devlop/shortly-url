@@ -96,10 +96,14 @@ async def sparklines(
 @router.get("/devices", response_model=DeviceBreakdownOut)
 async def devices(
     days: int = Query(default=7, ge=1, le=90),
+    exclude_bots: bool = Query(default=False, description="Drop the 'bot' device class from the breakdown."),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> DeviceBreakdownOut:
     """Device mix (desktop/mobile/tablet/bot/other) across the caller's links.
+
+    Set ``exclude_bots=true`` to hide crawler traffic. The ``total`` always
+    counts exactly the clicks covered by the returned items.
 
     NOTE: registered before ``/{code}`` so "devices" is never read as a code.
     """
@@ -108,7 +112,9 @@ async def devices(
             await db.execute(select(Link.id).where(Link.owner_id == user.id))
         ).scalars().all()
     )
-    items, total = await get_device_breakdown_global(db, days=days, link_ids=link_ids)
+    items, total = await get_device_breakdown_global(
+        db, days=days, link_ids=link_ids, exclude_bots=exclude_bots
+    )
     return DeviceBreakdownOut(
         window_days=days,
         total=total,

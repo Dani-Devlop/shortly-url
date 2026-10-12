@@ -1,10 +1,12 @@
 """HTML dashboard at ``/`` — recent links, click counts, per-code lookup,
-top links and client-side admin actions (copy / QR / edit / delete).
+top links and client-side admin actions (copy / QR / edit / delete) — plus
+the public, shareable stats page at ``/s/{code}``.
 """
 
 import math
 import os
-from datetime import UTC, datetime
+import re
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -17,10 +19,15 @@ from app import __version__
 from app.db.session import get_db
 from app.models import Click, Link
 from app.services.stats_service import (
+    count_clicks,
+    count_unique_clicks,
     count_unique_clicks_global,
     get_daily_clicks_for_links,
+    get_device_breakdown,
     get_device_breakdown_global,
+    get_recent_clicks,
     get_recent_clicks_global,
+    get_top_referrers,
 )
 
 router = APIRouter(tags=["pages"])
@@ -33,6 +40,10 @@ SPARKLINE_DAYS = 7
 DELTA_WINDOW_DAYS = 14  # current week + previous week for the trend chip
 DEVICE_PANEL_DAYS = 7
 ACTIVITY_ROWS = 8
+STATS_PAGE_DAYS = 14  # public stats page chart window
+STATS_PAGE_RECENT = 8  # public stats page recent-click rows
+STATS_PAGE_REFERRERS = 5
+PUBLIC_CODE_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
 DEVICE_CLASSES = ("desktop", "mobile", "tablet", "bot", "other")
 PER_PAGE_CHOICES = (10, 25, 50)
 TOP_LINKS_POOL = 200  # window scanned for the "Top links" panel
@@ -218,6 +229,7 @@ async def _links_with_counts(
             "created_abs": _fmt_abs(link.created_at),
             "created_rel": _fmt_rel(link.created_at),
             "expiry": _expiry_view(link.expires_at),
+            "utm": link.utm_template,
             "sparkline": _sparkline_svg(series.get(link.id, [0] * SPARKLINE_DAYS))
             if with_sparks
             else "",
@@ -235,6 +247,7 @@ async def dashboard(
     sort: str = Query(default="recent", pattern="^(recent|clicks)$"),
     page: int = Query(default=1, ge=1, le=1000),
     per_page: int = Query(default=25, ge=1, le=100),
+    bots: bool = Query(default=True, description="Include the 'bot' device class in the Devices panel."),
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     if per_page not in PER_PAGE_CHOICES:
@@ -260,6 +273,7 @@ async def dashboard(
         "activity_total": 0,
         "trend": None,
         "unique_visitors": 0,
+        "bots": bots,
     }
     try:
         total_links = int(
@@ -322,7 +336,7 @@ async def dashboard(
         )[:5]
 
         dev_items, dev_total = await get_device_breakdown_global(
-            db, days=DEVICE_PANEL_DAYS
+            db, days=DEVICE_PANEL_DAYS, exclude_bots=not bots
         )
         context["devices"] = _device_panel(dev_items, dev_total)
         context["devices_total"] = dev_total
@@ -354,4 +368,105 @@ async def dashboard(
 
     return _templates.TemplateResponse(
         request=request, name="dashboard.html", context=context
+    )
+
+
+def _stats_chart_bars(points: list[int]) -> list[dict]:
+    """Render data for the public stats page's 14-day bar chart."""
+    if not points:
+        return []
+    max_value = max(points)
+    today = datetime.now(UTC).date()
+    bars = []
+    for index, value in enumerate(points):
+        day = today - timedelta(days=len(points) - 1 - index)
+        pct = round(value * 100 / max_value) if max_value else 0
+        bars.append({"date": day.isoformat(), "clicks": value, "pct": max(pct, 6 if value else 0)})
+    return bars
+
+
+@router.get("/s/{code}", response_class=HTMLResponse, include_in_schema=False)
+async def public_stats_page(
+    request: Request,
+    code: str,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Public, shareable stats page for one short link — no API key needed.
+
+    Privacy posture mirrors the owner APIs: referrers are reduced to hosts,
+    IP hashes are never shown. Unknown/malformed codes render a styled 404.
+    """
+    base_url = str(request.base_url).rstrip("/")
+    context: dict = {
+        "version": __version__,
+        "not_found": False,
+        "link": None,
+        "total_clicks": 0,
+        "unique_clicks": 0,
+        "bars": [],
+        "chart_days": STATS_PAGE_DAYS,
+        "devices": [],
+        "devices_total": 0,
+        "referrers": [],
+        "recent": [],
+        "stats_url": f"{base_url}/s/{code}",
+    }
+    status_code = 200
+    if not PUBLIC_CODE_PATTERN.match(code):
+        context["not_found"] = True
+        return _templates.TemplateResponse(
+            request=request, name="stats.html", context=context, status_code=404
+        )
+    try:
+        link = await db.scalar(select(Link).where(Link.code == code))
+        if link is None:
+            context["not_found"] = True
+            status_code = 404
+        else:
+            total = await count_clicks(db, link.id)
+            series = await get_daily_clicks_for_links(db, [link.id], days=STATS_PAGE_DAYS)
+            points = series.get(link.id, [0] * STATS_PAGE_DAYS)
+            dev_items = await get_device_breakdown(db, link)
+            dev_total = sum(clicks for _, clicks in dev_items)
+            refs = await get_top_referrers(db, link, limit=STATS_PAGE_REFERRERS)
+            recent_rows = await get_recent_clicks(db, link, limit=STATS_PAGE_RECENT)
+            context.update(
+                {
+                    "link": {
+                        "code": link.code,
+                        "short_url": _short_url(base_url, link.code),
+                        "original_url": link.original_url,
+                        "dest_host": _referrer_host(link.original_url) or link.original_url[:64],
+                        "created_abs": _fmt_abs(link.created_at),
+                        "expiry": _expiry_view(link.expires_at),
+                        "utm": link.utm_template,
+                    },
+                    "total_clicks": total,
+                    "unique_clicks": await count_unique_clicks(db, link.id),
+                    "bars": _stats_chart_bars(points),
+                    "devices": _device_panel(dev_items, dev_total),
+                    "devices_total": dev_total,
+                    "referrers": [
+                        {
+                            "source": source or "direct",
+                            "clicks": clicks,
+                            "host": _referrer_host(source) or "direct",
+                        }
+                        for source, clicks in refs
+                    ],
+                    "recent": [
+                        {
+                            "when": _fmt_rel(click.clicked_at),
+                            "when_abs": _fmt_abs(click.clicked_at),
+                            "device": click.device or "other",
+                            "referrer_host": _referrer_host(click.referrer),
+                        }
+                        for click in recent_rows
+                    ],
+                }
+            )
+    except Exception:  # noqa: BLE001 — degrade gracefully when the DB is down
+        context["error"] = "Database unavailable — please try again in a moment."
+    return _templates.TemplateResponse(
+        request=request, name="stats.html", context=context, status_code=status_code
     )
