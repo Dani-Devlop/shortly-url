@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import __version__
 from app.core.config import get_settings
 from app.core.redis import get_redis
 from app.db.session import get_db
@@ -34,7 +35,7 @@ async def health(db: AsyncSession = Depends(get_db)) -> JSONResponse:
         "status": "ok" if db_ok else "degraded",
         "database": db_ok,
         "redis": redis_ok,
-        "version": "1.0.0",
+        "version": __version__,
         "environment": settings.environment,
     }
     return JSONResponse(status_code=200 if db_ok else 503, content=payload)

@@ -49,3 +49,24 @@ class DailyStats(BaseModel):
     window_days: int
     total: int
     items: list[DailyStatPoint]
+
+
+class LinkUpdate(BaseModel):
+    url: HttpUrl = Field(
+        ...,
+        examples=["https://example.com/new/destination"],
+        description="New destination URL (http/https, max 2048 chars).",
+    )
+
+
+class RecentClickOut(BaseModel):
+    clicked_at: datetime
+    ip_hash: str | None = None
+    user_agent: str | None = None
+
+
+class LinkDetailOut(LinkOut):
+    recent_clicks: list[RecentClickOut] = Field(
+        default_factory=list,
+        description="Most recent clicks (max 20), newest first.",
+    )

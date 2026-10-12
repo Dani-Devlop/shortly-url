@@ -148,6 +148,89 @@
       }
     },
     {
+      "name": "Link Detail (recent clicks)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('recent_clicks is an array', () => pm.expect(body.recent_clicks).to.be.an('array'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/links/{{code}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "links", "{{code}}"]
+        },
+        "description": "Full detail for one link, including the 20 most recent clicks (hashed IP prefix + user agent)."
+      }
+    },
+    {
+      "name": "Update Destination",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('original_url updated', () => pm.expect(pm.response.json().original_url).to.contain('updated'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "X-API-Key", "value": "{{apiKey}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"url\": \"https://example.com/updated/destination\" }"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/links/{{code}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "links", "{{code}}"]
+        },
+        "description": "Point the short code at a new destination. The cached redirect mapping is invalidated automatically."
+      }
+    },
+    {
+      "name": "QR Code (SVG)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('Content is SVG', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('image/svg+xml'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/{{code}}/qr",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{code}}", "qr"]
+        },
+        "description": "Public, cacheable SVG QR code pointing at the short URL."
+      }
+    },
+    {
       "name": "Delete Link",
       "event": [
         {

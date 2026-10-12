@@ -32,8 +32,11 @@ The collection ships with variables `baseUrl` and `apiKey` and covers every endp
 ## ✨ Features
 
 - **Shorten** any `http(s)` URL — auto-generated 7-char codes or validated custom aliases (`4–16` chars)
-- **Redirects** served from a Redis cache-aside layer with a PostgreSQL source of truth
-- **Click analytics** — total clicks + daily aggregation, recorded asynchronously via background tasks (zero redirect latency impact)
+- **Redirects** served from a Redis cache-aside layer with a PostgreSQL source of truth (`X-Cache: HIT|MISS` header on every redirect)
+- **Update destinations** — `PATCH /api/links/{code}` repoints a code, invalidating its cache entry
+- **Click analytics** — total clicks, daily aggregation, and the 20 most recent clicks per link; recorded asynchronously via background tasks (zero redirect latency impact)
+- **SVG QR codes** at `GET /{code}/qr` — pure-Python generation, no image deps
+- **Interactive dashboard** at `/` — top links, sorting, copy-to-clipboard, QR, and create/edit/delete actions (API key stays in your browser's sessionStorage)
 - **Per-key rate limiting** on `POST /api/shorten` (Redis fixed window, fails open if Redis is down)
 - **IP privacy** — visitor IPs are salted & SHA-256 hashed before storage
 - **Graceful degradation** — Redis down → falls back to DB; DB down → clean `503/500` JSON errors
@@ -44,12 +47,14 @@ The collection ships with variables `baseUrl` and `apiKey` and covers every endp
 | Method | Path | Auth (`X-API-Key`) | Description |
 |---|---|---|---|
 | `POST` | `/api/shorten` | ✅ | Create a short link. Body: `{"url": "...", "custom_code": null}` |
-| `GET` | `/{code}` | — | `302` redirect to the original URL (click recorded in background) |
-| `GET` | `/api/stats/{code}` | ✅ | Total clicks for a link |
-| `GET` | `/api/stats/{code}/daily?days=14` | ✅ | Daily aggregated clicks (1–90 day window) |
+| `GET` | `/{code}` | — | `302` redirect to the original URL (click recorded in background, `X-Cache: HIT\|MISS`) |
+| `GET` | `/{code}/qr` | — | SVG QR code for the short URL (cacheable, public) |
 | `GET` | `/api/links` | ✅ | List the authenticated user's links with click counts |
+| `GET` | `/api/links/{code}` | ✅ | Link detail incl. the 20 most recent clicks (hashed IP prefix, user agent) |
+| `PATCH` | `/api/links/{code}` | ✅ | Update the destination URL (invalidates the cache entry) |
 | `DELETE` | `/api/links/{code}` | ✅ | Delete a link (cascades click rows, invalidates cache) |
 | `GET` | `/health` | — | DB/Redis health probe (`503` when DB is down) |
+| `GET` | `/docs` | — | Interactive Swagger docs |
 
 Errors are always structured: `{"error": {"code": "...", "message": "..."}}`.
 
@@ -97,7 +102,7 @@ Run migrations against a real database with `alembic upgrade head`.
 ## 🧪 Tests
 
 ```bash
-pytest -v          # 45 tests, async SQLite + fakeredis, no services needed
+pytest -v          # 61 tests, async SQLite + fakeredis, no services needed
 ruff check .       # lint
 python scripts/load_test.py --base http://localhost:8000 --code <code> --total 1000 --concurrency 50
 ```

@@ -68,3 +68,16 @@ async def get_daily_clicks(
         .order_by(day.desc())
     )
     return [(str(row.day), int(row.clicks)) for row in rows.all()]
+
+
+async def get_recent_clicks(
+    db: AsyncSession, link: Link, limit: int = 20
+) -> list[Click]:
+    """Most recent click rows, newest first (for the link-detail view)."""
+    rows = await db.execute(
+        select(Click)
+        .where(Click.link_id == link.id)
+        .order_by(Click.clicked_at.desc(), Click.id.desc())
+        .limit(limit)
+    )
+    return list(rows.scalars().all())

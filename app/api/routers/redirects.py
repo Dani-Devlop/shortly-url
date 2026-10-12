@@ -1,10 +1,16 @@
-"""Public redirect endpoint — the hot path (Redis cache + background click tracking)."""
+"""Public redirect endpoint — the hot path (Redis cache + background click tracking)
+plus the QR-code view for a short link.
+"""
 
+import io
 import re
 
+import qrcode
+import qrcode.image.svg
 from fastapi import APIRouter, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 
+from app.core.config import get_settings
 from app.core.exceptions import NotFoundError
 from app.db.session import get_session_factory
 from app.services.click_service import click_task
@@ -35,16 +41,43 @@ async def redirect_by_code(
     # therefore the background click task) runs — no pool slot is held across
     # the redirect.
     async with get_session_factory()() as db:
-        payload = await resolve_target(db, code)
+        payload, cache_hit = await resolve_target(db, code)
 
     return RedirectResponse(
         url=payload["url"],
         status_code=302,  # 302 (not 301) so browsers don't cache past analytics
-        headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"},
+        headers={
+            "Cache-Control": "no-store",
+            "X-Robots-Tag": "noindex",
+            "X-Cache": "HIT" if cache_hit else "MISS",
+        },
         background=click_task(
             link_id=int(payload["id"]),
             code=code,
             ip=_client_ip(request),
             user_agent=request.headers.get("user-agent"),
         ),
+    )
+
+
+@router.get("/{code}/qr", include_in_schema=False)
+async def qr_code(code: str) -> Response:
+    """SVG QR code pointing at the short URL (public, cacheable)."""
+    if not CODE_PATTERN.match(code):
+        raise NotFoundError(f"Short code '{code}' does not exist")
+
+    async with get_session_factory()() as db:
+        payload, _ = await resolve_target(db, code)
+    short_url = f"{get_settings().base_url.rstrip('/')}/{code}"
+
+    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=12, border=2)
+    qr.add_data(short_url)
+    qr.make(fit=True)
+    buffer = io.BytesIO()
+    qr.make_image(image_factory=qrcode.image.svg.SvgPathImage).save(buffer)
+
+    return Response(
+        content=buffer.getvalue(),
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=86400"},
     )

@@ -11,9 +11,18 @@ from app.core.rate_limit import enforce_rate_limit
 from app.core.security import hash_identifier
 from app.db.session import get_db
 from app.models import Link, User
-from app.schemas.link import LinkOut, ShortenRequest
-from app.services.link_service import create_link, delete_link, get_link_by_code
-from app.services.stats_service import click_counts_for_links, get_total_clicks
+from app.schemas.link import LinkDetailOut, LinkOut, LinkUpdate, RecentClickOut, ShortenRequest
+from app.services.link_service import (
+    create_link,
+    delete_link,
+    get_link_by_code,
+    update_destination,
+)
+from app.services.stats_service import (
+    click_counts_for_links,
+    get_recent_clicks,
+    get_total_clicks,
+)
 
 router = APIRouter(prefix="/api", tags=["links"])
 settings = get_settings()
@@ -68,6 +77,50 @@ async def list_links(
     ).scalars().all()
     counts = await click_counts_for_links(db, [link.id for link in rows])
     return [_to_out(link, counts.get(link.id, 0)) for link in rows]
+
+
+@router.get("/links/{code}", response_model=LinkDetailOut)
+async def link_detail(
+    code: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> LinkDetailOut:
+    """Full detail for one of the user's links, including the 20 most recent clicks."""
+    link = await get_link_by_code(db, code)
+    if link is None or link.owner_id != user.id:
+        raise NotFoundError(f"Short code '{code}' does not exist")
+    recent = [
+        RecentClickOut(
+            clicked_at=click.clicked_at,
+            ip_hash=click.ip_hash[:12] if click.ip_hash else None,
+            user_agent=click.user_agent,
+        )
+        for click in await get_recent_clicks(db, link, limit=20)
+    ]
+    return LinkDetailOut(
+        id=link.id,
+        code=link.code,
+        short_url=f"{settings.base_url.rstrip('/')}/{link.code}",
+        original_url=link.original_url,
+        created_at=link.created_at,
+        total_clicks=await get_total_clicks(db, link),
+        recent_clicks=recent,
+    )
+
+
+@router.patch("/links/{code}", response_model=LinkOut)
+async def update_link_destination(
+    code: str,
+    payload: LinkUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> LinkOut:
+    """Point an existing short code at a new destination (cache is invalidated)."""
+    link = await get_link_by_code(db, code)
+    if link is None or link.owner_id != user.id:
+        raise NotFoundError(f"Short code '{code}' does not exist")
+    link = await update_destination(db, link, str(payload.url))
+    return _to_out(link, await get_total_clicks(db, link))
 
 
 @router.delete("/links/{code}", status_code=status.HTTP_204_NO_CONTENT)

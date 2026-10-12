@@ -10,15 +10,15 @@ from app.services.link_service import get_link_by_code
 settings = get_settings()
 
 
-async def resolve_target(db: AsyncSession, code: str) -> dict:
-    """Return ``{"url": ..., "id": ...}`` for a short code.
+async def resolve_target(db: AsyncSession, code: str) -> tuple[dict, bool]:
+    """Return ``({"url": ..., "id": ...}, cache_hit)`` for a short code.
 
     Cache hit → no DB round-trip. Miss → fetch from PostgreSQL and fill the cache.
     """
     cache_key = f"shortly:short:{code}"
     cached = await cache_get(cache_key)
     if isinstance(cached, dict) and {"url", "id"} <= cached.keys():
-        return cached
+        return cached, True
 
     link = await get_link_by_code(db, code)
     if link is None:
@@ -26,4 +26,4 @@ async def resolve_target(db: AsyncSession, code: str) -> dict:
 
     payload = {"url": link.original_url, "id": link.id}
     await cache_set(cache_key, payload, settings.cache_ttl_seconds)
-    return payload
+    return payload, False

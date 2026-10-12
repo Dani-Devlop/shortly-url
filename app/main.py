@@ -8,6 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app import __version__
 from app.api.routers import health, links, pages, redirects, stats
 from app.core.config import get_settings
 from app.core.exceptions import AppError
@@ -41,7 +42,7 @@ def create_app() -> FastAPI:
     application = FastAPI(
         title="shortly-url",
         description="Fast link shortener with click analytics.",
-        version="1.0.0",
+        version=__version__,
         lifespan=lifespan,
     )
 

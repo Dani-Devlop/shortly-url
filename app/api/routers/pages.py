@@ -1,4 +1,6 @@
-"""HTML dashboard at ``/`` — recent links + click counts + per-code lookup."""
+"""HTML dashboard at ``/`` — recent links, click counts, per-code lookup,
+top links and client-side admin actions (copy / QR / edit / delete).
+"""
 
 import os
 from datetime import UTC, datetime
@@ -9,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import __version__
 from app.db.session import get_db
 from app.models import Click, Link
 
@@ -19,65 +22,100 @@ _templates = Jinja2Templates(
 )
 
 
-def _fmt(dt: datetime | None) -> str:
+def _fmt_abs(dt: datetime | None) -> str:
     if dt is None:
         return "—"
     if dt.tzinfo is not None:
         dt = dt.astimezone(UTC)
-        return dt.strftime("%Y-%m-%d %H:%M UTC")
-    return dt.strftime("%Y-%m-%d %H:%M")
+    return dt.strftime("%Y-%m-%d %H:%M UTC")
 
 
-async def _summary(db: AsyncSession) -> dict:
-    total_links = int(
-        await db.scalar(select(func.count()).select_from(Link)) or 0
-    )
-    total_clicks = int(
-        await db.scalar(select(func.count()).select_from(Click)) or 0
-    )
-    return {"total_links": total_links, "total_clicks": total_clicks}
+def _fmt_rel(dt: datetime | None) -> str:
+    if dt is None:
+        return "—"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    delta = (datetime.now(UTC) - dt).total_seconds()
+    if delta < 0:
+        delta = 0
+    if delta < 60:
+        return "just now"
+    if delta < 3600:
+        return f"{int(delta // 60)}m ago"
+    if delta < 86400:
+        return f"{int(delta // 3600)}h ago"
+    if delta < 7 * 86400:
+        return f"{int(delta // 86400)}d ago"
+    return _fmt_abs(dt)[:10]
+
+
+def _short_url(base_url: str, code: str) -> str:
+    return f"{base_url.rstrip('/')}/{code}"
+
+
+def _truncate(url: str, limit: int = 64) -> str:
+    return url if len(url) <= limit else url[: limit - 1] + "…"
+
+
+async def _links_with_counts(db: AsyncSession, base_url: str, limit: int = 50) -> list[dict]:
+    links = (
+        await db.execute(
+            select(Link).order_by(Link.created_at.desc(), Link.id.desc()).limit(limit * 4)
+        )
+    ).scalars().all()
+    counts = {}
+    if links:
+        rows = await db.execute(
+            select(Click.link_id, func.count())
+            .where(Click.link_id.in_([link.id for link in links]))
+            .group_by(Click.link_id)
+        )
+        counts = {int(link_id): int(n) for link_id, n in rows.all()}
+    return [
+        {
+            "code": link.code,
+            "short_url": _short_url(base_url, link.code),
+            "original_url": link.original_url,
+            "original_url_display": _truncate(link.original_url),
+            "clicks": counts.get(link.id, 0),
+            "created_abs": _fmt_abs(link.created_at),
+            "created_rel": _fmt_rel(link.created_at),
+        }
+        for link in links
+    ]
 
 
 @router.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def dashboard(
     request: Request,
     code: str | None = Query(default=None, max_length=32),
+    sort: str = Query(default="recent", pattern="^(recent|clicks)$"),
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     context: dict = {
+        "version": __version__,
         "summary": {"total_links": 0, "total_clicks": 0},
         "links": [],
+        "top_links": [],
         "lookup": code or "",
+        "sort": sort,
         "selected": None,
         "error": None,
     }
     try:
-        context["summary"] = await _summary(db)
+        context["summary"] = {
+            "total_links": int(await db.scalar(select(func.count()).select_from(Link)) or 0),
+            "total_clicks": int(await db.scalar(select(func.count()).select_from(Click)) or 0),
+        }
 
-        recent = (
-            await db.execute(
-                select(Link).order_by(Link.created_at.desc(), Link.id.desc()).limit(50)
-            )
-        ).scalars().all()
-
-        counts: dict[int, int] = {}
-        if recent:
-            rows = await db.execute(
-                select(Click.link_id, func.count())
-                .where(Click.link_id.in_([link.id for link in recent]))
-                .group_by(Click.link_id)
-            )
-            counts = {int(link_id): int(n) for link_id, n in rows.all()}
-
-        context["links"] = [
-            {
-                "code": link.code,
-                "original_url": link.original_url,
-                "clicks": counts.get(link.id, 0),
-                "created_at": _fmt(link.created_at),
-            }
-            for link in recent
-        ]
+        base_url = str(request.base_url).rstrip("/")
+        entries = await _links_with_counts(db, base_url)
+        if sort == "clicks":
+            entries.sort(key=lambda item: item["clicks"], reverse=True)
+        context["links"] = entries[:50]
+        context["top_links"] = sorted(
+            entries, key=lambda item: item["clicks"], reverse=True
+        )[:5]
 
         if code:
             link = await db.scalar(select(Link).where(Link.code == code))
@@ -90,9 +128,10 @@ async def dashboard(
                 )
                 context["selected"] = {
                     "code": link.code,
+                    "short_url": _short_url(base_url, link.code),
                     "original_url": link.original_url,
                     "total_clicks": total,
-                    "created_at": _fmt(link.created_at),
+                    "created_abs": _fmt_abs(link.created_at),
                 }
     except Exception:  # noqa: BLE001 — the panel must render even when the DB is down
         context["error"] = "Database unavailable — please try again in a moment."

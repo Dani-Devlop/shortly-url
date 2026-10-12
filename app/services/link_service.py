@@ -100,3 +100,15 @@ async def delete_link(db: AsyncSession, link: Link) -> None:
     # Invalidate the cached mapping so deleted codes 404 immediately.
     await cache_delete(f"shortly:short:{code}")
     logger.info("deleted link code=%s", code)
+
+
+async def update_destination(db: AsyncSession, link: Link, new_url: str) -> Link:
+    """Point an existing short code at a new destination and invalidate its cache."""
+    validate_target_url(new_url)
+    link.original_url = new_url
+    db.add(link)
+    await db.commit()
+    await db.refresh(link)
+    await cache_delete(f"shortly:short:{link.code}")
+    logger.info("updated destination code=%s", link.code)
+    return link
