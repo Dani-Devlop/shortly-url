@@ -69,6 +69,63 @@ async def test_dashboard_theme_toggle_and_a11y(client):
     response = await client.get("/")
     assert 'id="themeToggle"' in response.text
     assert "data-countup" in response.text
-    assert "<dialog" in response.text  # edit/confirm/detail modals
+    assert "<dialog" in response.text  # edit/confirm/detail/QR modals
     assert "Bulk create" in response.text
     assert "aria-label" in response.text
+
+
+async def test_dashboard_v4_markup(client):
+    """Round-4 additions: table filter, per-page select, API reference, QR dialog."""
+    response = await client.get("/")
+    assert response.status_code == 200
+    body = response.text
+    assert 'id="tableFilter"' in body          # client-side filter
+    assert 'id="filterCount"' in body
+    assert "Per page" in body                  # server-side per-page select
+    assert "Quick API reference" in body       # left-column panel
+    assert "format=svg|png" in body
+    assert 'id="qrDlg"' in body                # QR modal (replaces new-tab link)
+    assert "Traffic sources · all time" in body  # referrer chips section
+    assert 'class="foot-inner"' in body        # structured footer with version pill
+
+
+async def test_dashboard_pagination_controls(client):
+    """With > per_page links the pager nav appears; page 2 shows the remainder."""
+    for i in range(12):
+        await shorten(client, url=f"https://example.com/page-check-{i}")
+
+    page1 = await client.get("/", params={"per_page": 10})
+    assert "Table pagination" in page1.text
+    assert "Showing 1–10 of 12 links" in page1.text
+    assert 'aria-current="page"' in page1.text
+    assert "&page=2" in page1.text
+
+    page2 = await client.get("/", params={"per_page": 10, "page": 2})
+    assert "Showing 11–12 of 12 links" in page2.text
+    # both page-2 rows are present, page-1 rows are not
+    assert page2.text.count('data-code=') == 2
+
+    # page number beyond the last page clamps to the last page
+    clamped = await client.get("/", params={"per_page": 10, "page": 99})
+    assert "Showing 11–12 of 12 links" in clamped.text
+
+    # single page → no pager markup at all
+    small = await client.get("/", params={"per_page": 50})
+    assert "Table pagination" not in small.text
+
+
+async def test_dashboard_avg_clicks_one_decimal(client):
+    data = await shorten(client, url="https://example.com/avg")
+    for _ in range(3):
+        await client.get(f"/{data['code']}")
+    response = await client.get("/")
+    assert response.status_code == 200
+    assert "Avg clicks / link" in response.text
+    assert ">3.0<" in response.text  # 3 clicks / 1 link with one decimal
+
+
+async def test_dashboard_per_page_invalid_falls_back(client):
+    await shorten(client, url="https://example.com/fallback")
+    response = await client.get("/", params={"per_page": 37})
+    assert response.status_code == 200
+    assert 'value="25" selected' in response.text  # clamped to a valid choice

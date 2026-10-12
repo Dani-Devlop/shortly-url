@@ -2,6 +2,7 @@
 top links and client-side admin actions (copy / QR / edit / delete).
 """
 
+import math
 import os
 from datetime import UTC, datetime
 
@@ -23,6 +24,8 @@ _templates = Jinja2Templates(
 )
 
 SPARKLINE_DAYS = 7
+PER_PAGE_CHOICES = (10, 25, 50)
+TOP_LINKS_POOL = 200  # window scanned for the "Top links" panel
 
 
 def _fmt_abs(dt: datetime | None) -> str:
@@ -111,11 +114,18 @@ def _truncate(url: str, limit: int = 64) -> str:
 
 
 async def _links_with_counts(
-    db: AsyncSession, base_url: str, limit: int = 50
+    db: AsyncSession,
+    base_url: str,
+    limit: int = 50,
+    offset: int = 0,
+    with_sparks: bool = True,
 ) -> tuple[list[dict], int]:
     links = (
         await db.execute(
-            select(Link).order_by(Link.created_at.desc(), Link.id.desc()).limit(limit * 4)
+            select(Link)
+            .order_by(Link.created_at.desc(), Link.id.desc())
+            .offset(offset)
+            .limit(limit)
         )
     ).scalars().all()
     counts = {}
@@ -128,7 +138,8 @@ async def _links_with_counts(
             .group_by(Click.link_id)
         )
         counts = {int(link_id): int(n) for link_id, n in rows.all()}
-        series = await get_daily_clicks_for_links(db, link_ids, days=SPARKLINE_DAYS)
+        if with_sparks:
+            series = await get_daily_clicks_for_links(db, link_ids, days=SPARKLINE_DAYS)
     entries = [
         {
             "code": link.code,
@@ -139,7 +150,9 @@ async def _links_with_counts(
             "created_abs": _fmt_abs(link.created_at),
             "created_rel": _fmt_rel(link.created_at),
             "expiry": _expiry_view(link.expires_at),
-            "sparkline": _sparkline_svg(series.get(link.id, [0] * SPARKLINE_DAYS)),
+            "sparkline": _sparkline_svg(series.get(link.id, [0] * SPARKLINE_DAYS))
+            if with_sparks
+            else "",
         }
         for link in links
     ]
@@ -152,34 +165,69 @@ async def dashboard(
     request: Request,
     code: str | None = Query(default=None, max_length=32),
     sort: str = Query(default="recent", pattern="^(recent|clicks)$"),
+    page: int = Query(default=1, ge=1, le=1000),
+    per_page: int = Query(default=25, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
+    if per_page not in PER_PAGE_CHOICES:
+        per_page = 25
     context: dict = {
         "version": __version__,
-        "summary": {"total_links": 0, "total_clicks": 0, "clicks_7d": 0},
+        "summary": {"total_links": 0, "total_clicks": 0, "clicks_7d": 0, "avg_clicks": "0"},
         "links": [],
         "top_links": [],
         "lookup": code or "",
         "sort": sort,
+        "page": page,
+        "per_page": per_page,
+        "per_page_choices": PER_PAGE_CHOICES,
+        "pagination": None,
         "selected": None,
         "error": None,
         "spark_days": SPARKLINE_DAYS,
     }
     try:
+        total_links = int(
+            await db.scalar(select(func.count()).select_from(Link)) or 0
+        )
+        total_clicks = int(
+            await db.scalar(select(func.count()).select_from(Click)) or 0
+        )
         context["summary"] = {
-            "total_links": int(await db.scalar(select(func.count()).select_from(Link)) or 0),
-            "total_clicks": int(await db.scalar(select(func.count()).select_from(Click)) or 0),
+            "total_links": total_links,
+            "total_clicks": total_clicks,
             "clicks_7d": 0,
+            "avg_clicks": f"{total_clicks / total_links:.1f}" if total_links else "0",
         }
 
+        total_pages = max(1, math.ceil(total_links / per_page))
+        page = min(page, total_pages)  # clamp stale page numbers after deletions
+        offset = (page - 1) * per_page
+
         base_url = str(request.base_url).rstrip("/")
-        entries, clicks_7d = await _links_with_counts(db, base_url)
+        entries, clicks_7d = await _links_with_counts(
+            db, base_url, limit=per_page, offset=offset
+        )
         context["summary"]["clicks_7d"] = clicks_7d
         if sort == "clicks":
             entries.sort(key=lambda item: item["clicks"], reverse=True)
-        context["links"] = entries[:50]
+        context["links"] = entries
+        context["page"] = page
+        context["pagination"] = {
+            "page": page,
+            "total_pages": total_pages,
+            "total": total_links,
+            "start": offset + 1 if total_links else 0,
+            "end": min(offset + per_page, total_links),
+            "has_prev": page > 1,
+            "has_next": page < total_pages,
+        }
+
+        top_pool, _ = await _links_with_counts(
+            db, base_url, limit=TOP_LINKS_POOL, with_sparks=False
+        )
         context["top_links"] = sorted(
-            entries, key=lambda item: item["clicks"], reverse=True
+            top_pool, key=lambda item: item["clicks"], reverse=True
         )[:5]
 
         if code:

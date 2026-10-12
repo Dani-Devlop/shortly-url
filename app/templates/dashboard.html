@@ -211,6 +211,71 @@
     ol.top-list a:hover { color: var(--accent); }
     ol.top-list .dest { color: var(--muted); font-size: .74rem; display: block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+    /* ---- quick API reference ---- */
+    .api-list { list-style: none; display: flex; flex-direction: column; }
+    .api-list li {
+      display: flex; align-items: center; gap: .55rem; padding: .42rem 0;
+      border-bottom: 1px dashed var(--border); font-size: .8rem;
+    }
+    .api-list li:last-child { border-bottom: 0; }
+    .api-list code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); font-size: .76rem; }
+    .method {
+      font-size: .62rem; font-weight: 700; letter-spacing: .05em; border-radius: 5px;
+      padding: .12rem .4rem; min-width: 3.2rem; text-align: center; flex-shrink: 0;
+    }
+    .method.post { background: var(--accent-soft); color: var(--accent); }
+    .method.get  { background: rgba(148, 163, 184, .14); color: var(--muted); }
+    .method.del  { background: var(--danger-soft); color: var(--danger); }
+    .api-list .desc { color: var(--muted); margin-left: auto; font-size: .7rem; text-align: right; }
+
+    /* ---- table filter ---- */
+    .filter-box { position: relative; display: inline-flex; align-items: center; }
+    .filter-box svg {
+      position: absolute; left: .65rem; width: 14px; height: 14px; fill: none;
+      stroke: var(--muted); stroke-width: 2; stroke-linecap: round; pointer-events: none;
+    }
+    .filter-box input {
+      padding-left: 2rem; min-height: 38px; width: 200px; font-size: .82rem;
+    }
+    .filter-box input:not(:placeholder-shown) { width: 240px; }
+    #filterCount { color: var(--muted); font-size: .74rem; margin-left: .5rem; white-space: nowrap; }
+    tr.row-hidden { display: none; }
+
+    /* ---- pagination ---- */
+    .pager { display: flex; justify-content: space-between; align-items: center; gap: .75rem; flex-wrap: wrap; padding: .7rem .2rem 0; }
+    .pager .range { color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
+    .pager .pages { display: flex; gap: .3rem; align-items: center; }
+    .page-btn {
+      min-height: 34px; padding: .3rem .75rem; border-radius: 8px; border: 1px solid var(--border-strong);
+      background: transparent; color: var(--text); font-weight: 600; font-size: .8rem; cursor: pointer;
+      text-decoration: none; display: inline-flex; align-items: center; transition: all .12s ease;
+    }
+    .page-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .page-btn[aria-current="page"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+    .page-btn:disabled { opacity: .4; cursor: not-allowed; }
+    .page-btn.dots { border: 0; cursor: default; color: var(--muted); }
+
+    /* ---- referrer chips ---- */
+    .ref-chips { display: flex; flex-direction: column; gap: .4rem; }
+    .ref-chip {
+      display: grid; grid-template-columns: minmax(0, 1fr) 2.2rem; align-items: center; gap: .6rem;
+      font-size: .78rem;
+    }
+    .ref-chip .ref-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+    .ref-chip .ref-name .host { color: var(--accent); font-weight: 600; }
+    .ref-chip .ref-bar-wrap { grid-column: 1 / -1; height: 4px; border-radius: 4px; background: var(--border); overflow: hidden; }
+    .ref-chip .ref-bar { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent-strong), var(--accent)); min-width: 3px; }
+    .ref-chip .ref-count { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+    .ref-title { font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: .2rem; }
+    .click-log .ref { color: var(--accent); opacity: .85; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ---- QR dialog ---- */
+    .qr-holder {
+      display: grid; place-items: center; padding: 1rem; border: 1px dashed var(--border-strong);
+      border-radius: var(--radius-sm); background: #fff;
+    }
+    .qr-holder img { width: 200px; height: 200px; display: block; image-rendering: pixelated; }
+
     details.admin { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); }
     details.admin summary {
       cursor: pointer; padding: .8rem 1.1rem; font-weight: 700; font-size: .9rem;
@@ -286,9 +351,11 @@
     footer {
       margin-top: auto; padding: 1rem 2rem; text-align: center; color: var(--muted);
       font-size: .78rem; border-top: 1px solid var(--border);
+      padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
     }
     footer a { color: var(--accent); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
+    footer .foot-inner { display: flex; justify-content: center; align-items: center; gap: .5rem; flex-wrap: wrap; }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation: none !important; transition: none !important; }
     }
@@ -297,6 +364,9 @@
       .tagline .hide-sm { display: none; }
       .url-cell { max-width: 150px; }
       main { padding-top: 1.1rem; }
+      .filter-box input { width: 130px; }
+      .filter-box input:not(:placeholder-shown) { width: 160px; }
+      .pager { flex-direction: column; align-items: center; }
     }
   </style>
 </head>
@@ -323,15 +393,31 @@
       <div class="card"><div class="value" data-countup="{{ summary.total_links }}">0</div><div class="label">Short links</div></div>
       <div class="card"><div class="value amber" data-countup="{{ summary.total_clicks }}">0</div><div class="label">Total clicks</div></div>
       <div class="card"><div class="value" data-countup="{{ summary.clicks_7d }}">0</div><div class="label">Clicks · last {{ spark_days }}d</div></div>
-      <div class="card"><div class="value">{{ summary.total_clicks // summary.total_links if summary.total_links else 0 }}</div><div class="label">Avg clicks / link</div></div>
+      <div class="card"><div class="value">{{ summary.avg_clicks }}</div><div class="label">Avg clicks / link</div></div>
     </section>
 
     <section class="grid-2">
-      <form class="panel search" method="get" action="/" aria-label="Look up a short code">
-        <input name="code" placeholder="Look up a short code (e.g. aB3xK9m)" value="{{ lookup }}" aria-label="Short code">
-        <input type="hidden" name="sort" value="{{ sort }}">
-        <button type="submit">Check stats</button>
-      </form>
+      <div style="display:flex; flex-direction:column; gap:1rem">
+        <form class="panel search" method="get" action="/" aria-label="Look up a short code">
+          <input name="code" placeholder="Look up a short code (e.g. aB3xK9m)" value="{{ lookup }}" aria-label="Short code">
+          <input type="hidden" name="sort" value="{{ sort }}">
+          <input type="hidden" name="per_page" value="{{ per_page }}">
+          <button type="submit">Check stats</button>
+        </form>
+        <div class="panel">
+          <h2>🧭 Quick API reference <span class="hint">X-API-Key required</span></h2>
+          <ul class="api-list">
+            <li><span class="method post">POST</span><code>/api/shorten</code><span class="desc">create a link</span></li>
+            <li><span class="method get">GET</span><code>/api/links?limit&offset</code><span class="desc">list (paginated)</span></li>
+            <li><span class="method get">GET</span><code>/api/stats/{code}</code><span class="desc">total clicks</span></li>
+            <li><span class="method get">GET</span><code>/api/stats/{code}/daily</code><span class="desc">per-day series</span></li>
+            <li><span class="method get">GET</span><code>/{code}</code><span class="desc">redirect 302</span></li>
+            <li><span class="method get">GET</span><code>/{code}/qr?format=svg|png</code><span class="desc">QR code</span></li>
+            <li><span class="method del">DELETE</span><code>/api/links/{code}</code><span class="desc">remove link</span></li>
+          </ul>
+          <p class="note" style="margin-top:.6rem">Full schemas at <a href="/docs" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">/docs</a> · Postman collection in the repo.</p>
+        </div>
+      </div>
       <div class="panel">
         <h2>👑 Top links <span class="hint">by clicks</span></h2>
         <ol class="top-list">
@@ -398,8 +484,20 @@
     <section>
       <div class="toolbar">
         <h2 style="margin:0">🔗 Recent links <span class="hint">hover a row for actions</span></h2>
-        <form method="get" action="/">
+        <form method="get" action="/" style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap">
           <input type="hidden" name="code" value="{{ lookup }}">
+          <span class="filter-box">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="tableFilter" type="search" placeholder="Filter this page…" aria-label="Filter links on this page" autocomplete="off">
+          </span>
+          <span id="filterCount" aria-live="polite"></span>
+          <label>Per page
+            <select name="per_page" onchange="this.form.submit()">
+              {% for choice in per_page_choices %}
+                <option value="{{ choice }}" {{ 'selected' if per_page == choice }}>{{ choice }}</option>
+              {% endfor %}
+            </select>
+          </label>
           <label>Sort
             <select name="sort" onchange="this.form.submit()">
               <option value="recent" {{ 'selected' if sort == 'recent' }}>Newest first</option>
@@ -415,7 +513,7 @@
           </thead>
           <tbody>
             {% for l in links %}
-              <tr data-code="{{ l.code }}" style="--i: {{ loop.index0 }}">
+              <tr data-code="{{ l.code }}" data-url="{{ l.original_url|lower }}" style="--i: {{ loop.index0 }}">
                 <td><a href="/{{ l.code }}" target="_blank" rel="noopener noreferrer">{{ l.code }}</a></td>
                 <td class="url-cell" title="{{ l.original_url }}">
                   <a href="{{ l.original_url }}" target="_blank" rel="noopener noreferrer">{{ l.original_url_display }}</a>
@@ -438,9 +536,9 @@
                     <button class="icon-btn" title="Insights &amp; recent clicks" aria-label="Insights for {{ l.code }}" onclick="openDetail('{{ l.code }}')">
                       <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15v-4m5 4V7m5 12v-7"/></svg>
                     </button>
-                    <a class="icon-btn" title="QR code" aria-label="QR code for {{ l.code }}" href="{{ l.short_url }}/qr" target="_blank" rel="noopener noreferrer">
+                    <button class="icon-btn" title="QR code" aria-label="QR code for {{ l.code }}" onclick="openQr('{{ l.code }}', '{{ l.short_url }}')">
                       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM21 14v7h-7v-3"/></svg>
-                    </a>
+                    </button>
                     <button class="icon-btn warm admin-only" title="Edit destination / expiry" aria-label="Edit {{ l.code }}" onclick="openEdit('{{ l.code }}', this)">
                       <svg viewBox="0 0 24 24"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
                     </button>
@@ -462,6 +560,31 @@
           </tbody>
         </table>
       </div>
+      {% if pagination and pagination.total_pages > 1 %}
+        <nav class="pager" aria-label="Table pagination">
+          <span class="range">Showing {{ pagination.start }}–{{ pagination.end }} of {{ pagination.total }} links</span>
+          <div class="pages">
+            {% set base = '/?sort=' ~ sort ~ '&per_page=' ~ per_page ~ (('&code=' ~ lookup) if lookup else '') %}
+            {% if pagination.has_prev %}
+              <a class="page-btn" href="{{ base }}&page={{ pagination.page - 1 }}" rel="prev">← Prev</a>
+            {% else %}
+              <button class="page-btn" disabled>← Prev</button>
+            {% endif %}
+            {% for p in range(1, pagination.total_pages + 1) %}
+              {% if p == 1 or p == pagination.total_pages or (p >= pagination.page - 1 and p <= pagination.page + 1) %}
+                <a class="page-btn" href="{{ base }}&page={{ p }}" {% if p == pagination.page %}aria-current="page"{% endif %}>{{ p }}</a>
+              {% elif p == pagination.page - 2 or p == pagination.page + 2 %}
+                <span class="page-btn dots">…</span>
+              {% endif %}
+            {% endfor %}
+            {% if pagination.has_next %}
+              <a class="page-btn" href="{{ base }}&page={{ pagination.page + 1 }}" rel="next">Next →</a>
+            {% else %}
+              <button class="page-btn" disabled>Next →</button>
+            {% endif %}
+          </div>
+        </nav>
+      {% endif %}
     </section>
   {% endif %}
 </main>
@@ -509,6 +632,10 @@
   <div class="dlg-head"><span id="detailDlgTitle">Insights</span><button type="button" class="dlg-close" onclick="detailDlg.close()">✕</button></div>
   <div class="dlg-body">
     <div id="detailMeta" class="dlg-dest"></div>
+    <div>
+      <div class="ref-title">Traffic sources · all time</div>
+      <div class="ref-chips" id="detailRefs"><span class="note">Loading…</span></div>
+    </div>
     <div class="click-log" id="detailClicks"><div class="empty">Loading…</div></div>
     <div class="row">
       <button type="button" id="detailExportBtn" class="subtle">⬇ Clicks CSV</button>
@@ -517,17 +644,34 @@
   </div>
 </dialog>
 
+<!-- QR dialog -->
+<dialog id="qrDlg" aria-labelledby="qrDlgTitle">
+  <div class="dlg-head"><span id="qrDlgTitle">QR code</span><button type="button" class="dlg-close" onclick="qrDlg.close()">✕</button></div>
+  <div class="dlg-body">
+    <div class="qr-holder"><img id="qrImg" alt="QR code" width="200" height="200"></div>
+    <p class="dlg-dest" id="qrTarget" style="text-align:center; word-break:break-all"></p>
+    <div class="row" style="justify-content:center">
+      <button type="button" id="qrCopyBtn" class="ghost">⧉ Copy link</button>
+      <a id="qrDownload" class="btn" download>⬇ Download PNG</a>
+      <a id="qrOpen" class="ghost btn" target="_blank" rel="noopener noreferrer">↗ Open</a>
+    </div>
+  </div>
+</dialog>
+
 <div id="toast" role="status" aria-live="polite"><span class="t-icon" id="toastIcon">✓</span><span id="toastMsg"></span></div>
 
 <footer>
-  shortly-url v{{ version }} · FastAPI + PostgreSQL + Redis ·
-  <a href="https://github.com/Dani-Devlop/shortly-url" target="_blank" rel="noopener noreferrer">GitHub</a> ·
-  <a href="/docs" target="_blank" rel="noopener noreferrer">API docs</a>
+  <div class="foot-inner">
+    <span>shortly-url</span><span class="pill">v{{ version }}</span>
+    <span class="hide-sm">· FastAPI + PostgreSQL + Redis ·</span>
+    <a href="https://github.com/Dani-Devlop/shortly-url" target="_blank" rel="noopener noreferrer">GitHub</a>·
+    <a href="/docs" target="_blank" rel="noopener noreferrer">API docs</a>
+  </div>
 </footer>
 
 <script>
   const $ = (sel) => document.querySelector(sel);
-  const editDlg = $('#editDlg'), confirmDlg = $('#confirmDlg'), detailDlg = $('#detailDlg');
+  const editDlg = $('#editDlg'), confirmDlg = $('#confirmDlg'), detailDlg = $('#detailDlg'), qrDlg = $('#qrDlg');
   let toastTimer;
   function showToast(message, isError = false, icon) {
     const el = $('#toast');
@@ -683,6 +827,69 @@
     confirmDlg.showModal();
   }
 
+  /* ---- table filter (client-side, current page only) ---- */
+  (function tableFilter() {
+    const input = $('#tableFilter');
+    if (!input) return;
+    const count = $('#filterCount');
+    const rows = Array.from(document.querySelectorAll('tbody tr[data-code]'));
+    input.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase();
+      let visible = 0;
+      rows.forEach((row) => {
+        const hay = row.dataset.code + ' ' + (row.dataset.url || '');
+        const hit = !q || hay.includes(q);
+        row.classList.toggle('row-hidden', !hit);
+        if (hit) visible += 1;
+      });
+      count.textContent = q ? visible + '/' + rows.length + ' shown' : '';
+    });
+  })();
+
+  /* ---- QR dialog ---- */
+  let qrCurrentUrl = '';
+  function openQr(code, shortUrl) {
+    qrCurrentUrl = shortUrl;
+    $('#qrDlgTitle').textContent = 'QR · ' + code;
+    $('#qrImg').src = '/' + encodeURIComponent(code) + '/qr?format=png';
+    $('#qrTarget').textContent = shortUrl;
+    $('#qrDownload').href = '/' + encodeURIComponent(code) + '/qr?format=png';
+    $('#qrDownload').setAttribute('download', code + '-qr.png');
+    $('#qrOpen').href = '/' + encodeURIComponent(code) + '/qr';
+    qrDlg.showModal();
+  }
+  $('#qrCopyBtn') && $('#qrCopyBtn').addEventListener('click', () => copyUrl(qrCurrentUrl));
+
+  /* ---- referrer helpers ---- */
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function refHost(ref) {
+    if (!ref) return '';
+    try { return new URL(ref).host || ref; } catch { return ref; }
+  }
+  function renderReferrers(list) {
+    const box = $('#detailRefs');
+    if (!list || !list.length) {
+      box.innerHTML = '<span class="note">No traffic recorded yet.</span>';
+      return;
+    }
+    const max = Math.max.apply(null, list.map((r) => r.clicks).concat([1]));
+    box.innerHTML = list.map((r) => {
+      const isDirect = r.source === 'direct';
+      const label = isDirect
+        ? '<span class="host">direct</span>'
+        : '<span class="host">' + escapeHtml(refHost(r.source)) + '</span>';
+      return '<div class="ref-chip">'
+        + '<span class="ref-name" title="' + escapeHtml(r.source) + '">' + label + '</span>'
+        + '<span class="ref-count">' + r.clicks + '</span>'
+        + '<span class="ref-bar-wrap"><span class="ref-bar" style="width:'
+        + Math.max(4, Math.round((r.clicks / max) * 100)) + '%"></span></span>'
+        + '</div>';
+    }).join('');
+  }
+
   /* ---- detail dialog ---- */
   let detailCode = '';
   async function openDetail(code) {
@@ -699,13 +906,17 @@
       const expiry = data.expires_at ? ' · ⏳ expires ' + new Date(data.expires_at).toLocaleString() : '';
       $('#detailMeta').innerHTML = '<strong>→</strong> ' + (data.original_url || '') + expiry
         + ' · <strong>' + data.total_clicks + '</strong> total clicks';
+      renderReferrers(data.top_referrers);
       const log = $('#detailClicks');
       if (!data.recent_clicks || !data.recent_clicks.length) {
         log.innerHTML = '<div class="empty">No clicks recorded yet.</div>';
       } else {
         log.innerHTML = data.recent_clicks.map((c) => {
           const t = new Date(c.clicked_at).toLocaleString();
-          return '<li><span>' + t + '</span><span class="ua" title="' + (c.user_agent || '') + '">'
+          const ref = c.referrer
+            ? '<span class="ref" title="' + escapeHtml(c.referrer) + '">' + escapeHtml(refHost(c.referrer)) + '</span>'
+            : '';
+          return '<li><span>' + t + '</span>' + ref + '<span class="ua" title="' + (c.user_agent || '') + '">'
             + (c.ip_hash || '—') + '</span></li>';
         }).join('');
       }
