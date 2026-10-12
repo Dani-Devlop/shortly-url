@@ -1,6 +1,6 @@
 """Click statistics: counting and daily aggregation (SQL is the source of truth)."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,7 +59,7 @@ async def get_daily_clicks(
     db: AsyncSession, link: Link, days: int = 14
 ) -> list[tuple[str, int]]:
     """Aggregated clicks per day, newest first. Portable across PG/SQLite via func.date()."""
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
     day = func.date(Click.clicked_at)
     rows = await db.execute(
         select(day.label("day"), func.count().label("clicks"))

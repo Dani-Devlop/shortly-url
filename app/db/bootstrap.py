@@ -13,9 +13,9 @@ settings = get_settings()
 
 async def create_all_tables() -> None:
     """Dev/demo convenience — production uses Alembic migrations."""
+    import app.models  # noqa: F401
     from app.db.base import Base
     from app.db.session import engine
-    import app.models  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

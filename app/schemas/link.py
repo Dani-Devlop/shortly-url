@@ -24,6 +24,7 @@ class ShortenRequest(BaseModel):
 class LinkOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    id: int
     code: str
     short_url: str
     original_url: str

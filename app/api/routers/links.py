@@ -21,6 +21,7 @@ settings = get_settings()
 
 def _to_out(link: Link, total_clicks: int) -> LinkOut:
     return LinkOut(
+        id=link.id,
         code=link.code,
         short_url=f"{settings.base_url.rstrip('/')}/{link.code}",
         original_url=link.original_url,

@@ -20,7 +20,7 @@ def hash_ip(ip: str | None) -> str | None:
     """Salted SHA-256 of the visitor IP — raw addresses are never stored."""
     if not ip:
         return None
-    value = f"{settings.ip_hash_salt}:{ip}".encode("utf-8")
+    value = f"{settings.ip_hash_salt}:{ip}".encode()
     return hashlib.sha256(value).hexdigest()
 
 
