@@ -51,7 +51,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"url\": \"https://example.com/some/very/long/path\",\n  \"custom_code\": null\n}"
+          "raw": "{\n  \"url\": \"https://example.com/some/very/long/path\",\n  \"custom_code\": null,\n  \"utm_template\": \"utm_source=newsletter&utm_campaign=launch\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/shorten",
@@ -63,7 +63,7 @@
             "shorten"
           ]
         },
-        "description": "Create a short link. Duplicate URLs from the same owner return the existing link. Optional `custom_code` must be 4–16 chars (letters/digits/-/_). With Redis enabled the response carries X-RateLimit-Limit / X-RateLimit-Remaining / X-RateLimit-Reset headers; exceeding the budget answers 429 with Retry-After."
+        "description": "Create a short link. Duplicate URLs from the same owner return the existing link. Optional `custom_code` (4–16 chars, letters/digits/-/_) and optional `utm_template` (default query params appended on every redirect; explicit short-URL params and destination params take precedence). With Redis enabled the response carries X-RateLimit-* headers; exceeding the budget answers 429 with Retry-After."
       }
     },
     {
@@ -283,7 +283,7 @@
           }
         ],
         "url": {
-          "raw": "{{baseUrl}}/api/stats/devices?days=7",
+          "raw": "{{baseUrl}}/api/stats/devices?days=7&exclude_bots=false",
           "host": [
             "{{baseUrl}}"
           ],
@@ -292,9 +292,20 @@
             "stats",
             "devices?days=7"
           ],
-          "query": []
+          "query": [
+            {
+              "key": "days",
+              "value": "7",
+              "description": "rolling window 1–90"
+            },
+            {
+              "key": "exclude_bots",
+              "value": "false",
+              "description": "true drops the 'bot' class from items and total"
+            }
+          ]
         },
-        "description": "Device mix (desktop/mobile/tablet/bot/other) across the caller's links over a rolling 1–90 day window. Returns {window_days, total, items:[{device, clicks}]}."
+        "description": "Device mix (desktop/mobile/tablet/bot/other) across the caller's links over a rolling 1–90 day window. Returns {window_days, total, items:[{device, clicks}]}. Set exclude_bots=true to hide crawler traffic."
       },
       "event": [
         {
@@ -614,7 +625,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"url\": \"https://example.com/updated/destination\",\n  \"expires_at\": null\n}"
+          "raw": "{\n  \"url\": \"https://example.com/updated/destination\",\n  \"expires_at\": null,\n  \"utm_template\": \"utm_source=banner&utm_medium=cpc\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/links/{{code}}",
@@ -627,7 +638,7 @@
             "{{code}}"
           ]
         },
-        "description": "Point the short code at a new destination and/or set `expires_at` (ISO 8601; send null to clear). The cached redirect mapping is invalidated automatically."
+        "description": "Point the short code at a new destination and/or set `expires_at` (ISO 8601; null clears) and/or set `utm_template` (null clears the campaign template). The cached redirect mapping is invalidated automatically."
       }
     },
     {
@@ -639,7 +650,7 @@
             "type": "text/javascript",
             "exec": [
               "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
-              "pm.test('Content is SVG', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('image/svg+xml'));"
+              "pm.test('Content is PNG', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('image/png'));"
             ]
           }
         }
@@ -648,7 +659,7 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/{{code}}/qr",
+          "raw": "{{baseUrl}}/{{code}}/qr?format=png&size=512",
           "host": [
             "{{baseUrl}}"
           ],
@@ -659,13 +670,49 @@
           "query": [
             {
               "key": "format",
-              "value": "svg",
+              "value": "png",
               "description": "svg | png"
+            },
+            {
+              "key": "size",
+              "value": "512",
+              "description": "image width/height in px (64–1024, default 256)"
             }
           ]
         },
-        "description": "QR code for the short URL. `format=svg` (default) or `format=png`."
+        "description": "QR code for the short URL. `format=svg` (default) or `format=png`; `size` scales the image (64–1024 px, default 256). PNG answers image/png, SVG image/svg+xml."
       }
+    },
+    {
+      "name": "Public Stats Page",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/s/{{code}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "s",
+            "{{code}}"
+          ]
+        },
+        "description": "Shareable public stats page for one short link — no API key required. Renders total/unique clicks, a 14-day bar chart, device mix, top traffic sources (hosts only) and the QR code. IP hashes are never exposed. Unknown codes answer 404."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('Content is HTML', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('text/html'));",
+              "pm.test('Page mentions the code', () => pm.expect(pm.response.text()).to.include(pm.collectionVariables.get('code')));"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Delete Link",
