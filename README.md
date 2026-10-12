@@ -39,11 +39,14 @@ The collection ships with variables `baseUrl` and `apiKey` and covers every endp
 - **CSV export** — download your links (`/api/links/export`) or every individual click of a link (`/api/stats/{code}/export`)
 - **Sparklines** — `GET /api/stats/sparklines` returns zero-filled daily click series (powering the dashboard's per-link trend charts)
 - **Click analytics** — total clicks, daily aggregation, the 20 most recent clicks per link, and **referrer (traffic source) tracking** with a top-5 sources breakdown; recorded asynchronously via background tasks (zero redirect latency impact)
+- **Unique visitors** — `unique_clicks` (distinct `ip_hash`) on `GET /api/stats/{code}`, link detail, and a **Unique visitors** summary card on the dashboard
+- **Query-param forwarding** — `/abc?utm_source=twitter` redirects to the destination with `utm_source=twitter` appended (incoming params win; destination UTMs preserved; fragment-safe)
+- **Global activity feed** — `GET /api/stats/activity?limit=20` streams the owner's newest clicks across all links (device class, referrer host, truncated IP hash) and powers the dashboard's **🛰 Live activity panel**, which live-polls every 10 s while admin is unlocked
 - **Device analytics** — every click is classified (from the user agent) as `desktop | mobile | tablet | bot | other`; get the mix per link (`device_breakdown` in link detail) or across all your links in a rolling window (`GET /api/stats/devices?days=7`); the dashboard shows a live stacked device bar
 - **Windowed referrers** — `GET /api/stats/{code}/referrers?days=7&limit=10` ranks traffic sources inside a 1–90 day rolling window (`total` counts the whole window even beyond `limit`)
 - **QR codes** at `GET /{code}/qr` — SVG (default) or PNG (`?format=png`), public and cacheable
 - **Paginated link listing** — `GET /api/links?limit=20&offset=0` returns `{items, total, limit, offset}`
-- **Interactive dashboard v5** at `/` — dark/light theme toggle (persisted), animated summary cards, per-link 7-day sparklines, expiry badges, **devices panel with stacked mix bar**, insights modal with **traffic-source bars + device breakdown + device chips per click**, client-side table filter, server-side pagination with page-size control, **auto-refresh toggle (30s, pauses while dialogs are open)**, inline QR dialog (preview/copy/download), quick API reference panel, bulk create, CSV downloads, and create/edit/delete actions (API key stays in your browser's sessionStorage)
+- **Interactive dashboard v6** at `/` — dark/light theme toggle (persisted), animated summary cards with a **weekly trend chip (▲▼ vs prev 7d)**, per-link 7-day sparklines, expiry badges, **devices panel with stacked mix bar**, **🛰 live activity feed (server-rendered + 10 s live-poll)**, insights modal with a **14-day mini bar chart** + **traffic-source bars + device breakdown + device chips per click + unique visitors**, client-side table filter, server-side pagination with page-size control, **auto-refresh toggle (30s, pauses while dialogs are open)**, centered animated dialogs, inline QR dialog (preview/copy/download), quick API reference panel, bulk create, CSV downloads, and create/edit/delete actions (API key stays in your browser's sessionStorage)
 - **Per-key rate limiting** on `POST /api/shorten` (Redis fixed window, weighted cost for bulk calls, fails open if Redis is down) with **observability headers**: `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset` on success and `Retry-After` on `429`
 - **IP privacy** — visitor IPs are salted & SHA-256 hashed before storage (truncated in UI and exports)
 - **Graceful degradation** — Redis down → falls back to DB; DB down → clean `503/500` JSON errors
@@ -55,17 +58,18 @@ The collection ships with variables `baseUrl` and `apiKey` and covers every endp
 |---|---|---|---|
 | `POST` | `/api/shorten` | ✅ | Create a short link. Body: `{"url": "...", "custom_code": null, "expires_at": null}` |
 | `POST` | `/api/shorten/bulk` | ✅ | Shorten 1–25 URLs in one call — per-item `created` / `duplicate` / `error` results |
-| `GET` | `/{code}` | — | `302` redirect (click recorded in background, `X-Cache: HIT\|MISS`, `410 Gone` when expired) |
+| `GET` | `/{code}` | — | `302` redirect (click recorded in background, `X-Cache: HIT\|MISS`, `410 Gone` when expired; query params are forwarded to the destination) |
 | `GET` | `/{code}/qr` | — | QR code for the short URL — `?format=svg` (default) or `?format=png` (cacheable, public) |
-| `GET` | `/api/stats/{code}` | ✅ | Total clicks for a link |
+| `GET` | `/api/stats/{code}` | ✅ | Total + unique clicks for a link |
 | `GET` | `/api/stats/{code}/daily?days=14` | ✅ | Daily aggregated clicks (1–90 day window) |
 | `GET` | `/api/stats/sparklines?days=7` | ✅ | Zero-filled per-link daily click series (1–30 days, up to 200 links) |
 | `GET` | `/api/stats/devices?days=7` | ✅ | Device mix (`desktop/mobile/tablet/bot/other`) across your links in a rolling window (1–90 days) |
+| `GET` | `/api/stats/activity?limit=20` | ✅ | Newest clicks across all your links (code, device, referrer host, truncated IP hash) — newest first |
 | `GET` | `/api/stats/{code}/referrers?days=7&limit=10` | ✅ | Top traffic sources for a link within a rolling window (1–90 days) |
 | `GET` | `/api/stats/{code}/export` | ✅ | CSV download of a link's individual clicks (truncated IP hashes, referrer + device columns) |
 | `GET` | `/api/links?limit=20&offset=0` | ✅ | Paginated list of the user's links — `{items, total, limit, offset}` (limit 1–100) |
 | `GET` | `/api/links/export` | ✅ | CSV download of all the user's links (click counts included) |
-| `GET` | `/api/links/{code}` | ✅ | Link detail incl. the 20 most recent clicks (hashed IP prefix, user agent, referrer, device) + all-time top-5 traffic sources + all-time device breakdown |
+| `GET` | `/api/links/{code}` | ✅ | Link detail incl. the 20 most recent clicks (hashed IP prefix, user agent, referrer, device) + all-time top-5 traffic sources + device breakdown + unique clicks + zero-filled 14-day daily series (`daily_14d`) |
 | `PATCH` | `/api/links/{code}` | ✅ | Update destination and/or expiry — `{"url": "...", "expires_at": null}` (null clears expiry) |
 | `DELETE` | `/api/links/{code}` | ✅ | Delete a link (cascades click rows, invalidates cache) |
 | `GET` | `/health` | — | DB/Redis health probe (`503` when DB is down) |
@@ -117,7 +121,7 @@ Run migrations against a real database with `alembic upgrade head`.
 ## 🧪 Tests
 
 ```bash
-pytest -v          # 155 tests, async SQLite + fakeredis, no services needed
+pytest -v          # 175 tests, async SQLite + fakeredis, no services needed
 ruff check .       # lint
 python scripts/load_test.py --base http://localhost:8000 --code <code> --total 1000 --concurrency 50
 ```

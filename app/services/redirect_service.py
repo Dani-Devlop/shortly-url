@@ -1,6 +1,8 @@
-"""Redirect resolution with a Redis cache-aside layer and expiry enforcement."""
+"""Redirect resolution with a Redis cache-aside layer, expiry enforcement
+and query-param forwarding (``/{code}?x=1`` → destination with ``x=1``)."""
 
 from datetime import UTC, datetime
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +12,36 @@ from app.core.redis import cache_get, cache_set
 from app.services.link_service import get_link_by_code
 
 settings = get_settings()
+
+MAX_URL_LENGTH = 2048  # mirrors the shorten-request URL cap
+
+
+def merge_query(destination: str, incoming_query: str, max_length: int = MAX_URL_LENGTH) -> str:
+    """Append the short-URL's query string onto the destination URL.
+
+    Incoming params win over same-named params already on the destination;
+    unknown destination params (UTMs, keys, ...) are preserved. The result is
+    inserted before any ``#fragment``. If the merged URL would exceed
+    ``max_length`` (or parsing fails), the bare destination is returned.
+    """
+    if not incoming_query:
+        return destination
+    try:
+        # Drop blank keys ("&=&&" yields ("", "") with keep_blank_values).
+        incoming = [(key, value) for key, value in parse_qsl(incoming_query, keep_blank_values=True) if key]
+        if not incoming:
+            return destination
+        parts = urlsplit(destination)
+        incoming_keys = {key for key, _ in incoming}
+        existing = parse_qsl(parts.query, keep_blank_values=True)
+        merged = [(key, value) for key, value in existing if key not in incoming_keys]
+        merged.extend(incoming)
+        combined = urlunsplit(
+            (parts.scheme, parts.netloc, parts.path, urlencode(merged), parts.fragment)
+        )
+    except ValueError:  # malformed destination or query — never break the redirect
+        return destination
+    return combined if len(combined) <= max_length else destination
 
 
 def _expired(exp: str | None) -> bool:

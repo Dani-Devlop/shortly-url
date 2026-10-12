@@ -138,7 +138,7 @@
             "{{code}}"
           ]
         },
-        "description": "Follow the short link. Each call records a click asynchronously (background task)."
+        "description": "302 redirect. Click recorded in background; query params on the short URL are forwarded to the destination (e.g. /abc?utm_source=x appends utm_source=x)."
       }
     },
     {
@@ -174,7 +174,8 @@
             "stats",
             "{{code}}"
           ]
-        }
+        },
+        "description": "Total + unique (distinct ip_hash) clicks for one link."
       }
     },
     {
@@ -313,6 +314,62 @@
               "    body.items.forEach((i) => pm.expect(known).to.include(i.device));",
               "});"
             ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stats — Activity Feed (recent clicks)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/stats/activity?limit=20",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "stats",
+            "activity"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "20",
+              "description": "1-100, default 20"
+            }
+          ]
+        },
+        "description": "The caller's newest clicks across all their links (code, device, referrer host, truncated IP hash). Powers the dashboard's Live activity panel."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('envelope has items + limit', () => {",
+              "  pm.expect(body).to.have.property('items');",
+              "  pm.expect(body).to.have.property('limit', 20);",
+              "});",
+              "if (body.items.length) {",
+              "  pm.test('items carry code/device', () => {",
+              "    pm.expect(body.items[0]).to.have.property('code');",
+              "    pm.expect(body.items[0]).to.have.property('device');",
+              "    pm.expect(body.items[0].ip_hash.length).to.be.at.most(12);",
+              "  });",
+              "}",
+              "// remember the newest code so follow-up requests can reuse it",
+              "if (body.items.length) pm.collectionVariables.set('code', body.items[0].code);"
+            ],
+            "type": "text/javascript"
           }
         }
       ]

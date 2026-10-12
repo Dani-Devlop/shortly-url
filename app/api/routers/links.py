@@ -38,6 +38,8 @@ from app.services.link_service import (
 )
 from app.services.stats_service import (
     click_counts_for_links,
+    count_unique_clicks,
+    get_daily_clicks_for_links,
     get_device_breakdown,
     get_recent_clicks,
     get_top_referrers,
@@ -237,8 +239,9 @@ async def link_detail(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> LinkDetailOut:
-    """Full detail for one of the user's links: the 20 most recent clicks and
-    the all-time top traffic sources and device mix."""
+    """Full detail for one of the user's links: the 20 most recent clicks,
+    the all-time top traffic sources and device mix, unique visitors and a
+    zero-filled 14-day daily series (for the dashboard insights chart)."""
     link = await _owned_link(db, code, user)
     recent = [
         RecentClickOut(
@@ -258,6 +261,9 @@ async def link_detail(
         DeviceStat(device=device, clicks=clicks)
         for device, clicks in await get_device_breakdown(db, link)
     ]
+    daily_14d = (await get_daily_clicks_for_links(db, [link.id], days=14)).get(
+        link.id, [0] * 14
+    )
     return LinkDetailOut(
         id=link.id,
         code=link.code,
@@ -266,9 +272,11 @@ async def link_detail(
         created_at=link.created_at,
         expires_at=link.expires_at,
         total_clicks=await get_total_clicks(db, link),
+        unique_clicks=await count_unique_clicks(db, link.id),
         recent_clicks=recent,
         top_referrers=referrers,
         device_breakdown=devices,
+        daily_14d=daily_14d,
     )
 
 

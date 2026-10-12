@@ -19,6 +19,43 @@ async def count_clicks(db: AsyncSession, link_id: int) -> int:
     return int(value or 0)
 
 
+async def count_unique_clicks(db: AsyncSession, link_id: int) -> int:
+    """Distinct visitors for one link (NULL ip_hash rows are not counted)."""
+    value = await db.scalar(
+        select(func.count(func.distinct(Click.ip_hash))).where(Click.link_id == link_id)
+    )
+    return int(value or 0)
+
+
+async def count_unique_clicks_global(
+    db: AsyncSession, link_ids: list[int] | None = None
+) -> int:
+    """Distinct visitors across the given links (``None`` = all links)."""
+    stmt = select(func.count(func.distinct(Click.ip_hash)))
+    if link_ids is not None:
+        if not link_ids:
+            return 0
+        stmt = stmt.where(Click.link_id.in_(link_ids))
+    value = await db.scalar(stmt)
+    return int(value or 0)
+
+
+async def get_recent_clicks_global(
+    db: AsyncSession, link_ids: list[int] | None = None, limit: int = 20
+) -> list[tuple[Click, str]]:
+    """Newest clicks across the given links (``None`` = all links).
+
+    Returns ``(click, code)`` pairs, newest first, for the activity feed.
+    """
+    stmt = select(Click, Link.code).join(Link, Click.link_id == Link.id)
+    if link_ids is not None:
+        if not link_ids:
+            return []
+        stmt = stmt.where(Click.link_id.in_(link_ids))
+    stmt = stmt.order_by(Click.clicked_at.desc(), Click.id.desc()).limit(limit)
+    return [(click, str(code)) for click, code in (await db.execute(stmt)).all()]
+
+
 async def click_counts_for_links(db: AsyncSession, link_ids: list[int]) -> dict[int, int]:
     """Batched click counts for a set of links (avoids N+1 queries)."""
     if not link_ids:

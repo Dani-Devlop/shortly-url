@@ -5,6 +5,7 @@ top links and client-side admin actions (copy / QR / edit / delete).
 import math
 import os
 from datetime import UTC, datetime
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse
@@ -16,8 +17,10 @@ from app import __version__
 from app.db.session import get_db
 from app.models import Click, Link
 from app.services.stats_service import (
+    count_unique_clicks_global,
     get_daily_clicks_for_links,
     get_device_breakdown_global,
+    get_recent_clicks_global,
 )
 
 router = APIRouter(tags=["pages"])
@@ -27,7 +30,9 @@ _templates = Jinja2Templates(
 )
 
 SPARKLINE_DAYS = 7
+DELTA_WINDOW_DAYS = 14  # current week + previous week for the trend chip
 DEVICE_PANEL_DAYS = 7
+ACTIVITY_ROWS = 8
 DEVICE_CLASSES = ("desktop", "mobile", "tablet", "bot", "other")
 PER_PAGE_CHOICES = (10, 25, 50)
 TOP_LINKS_POOL = 200  # window scanned for the "Top links" panel
@@ -116,6 +121,46 @@ def _short_url(base_url: str, code: str) -> str:
 
 def _truncate(url: str, limit: int = 64) -> str:
     return url if len(url) <= limit else url[: limit - 1] + "…"
+
+
+def _referrer_host(referrer: str | None) -> str | None:
+    """Reduce a stored referer to its host (privacy-safe display form)."""
+    if not referrer:
+        return None
+    try:
+        host = urlparse(referrer).netloc
+    except ValueError:
+        return referrer[:64]
+    return host[:64] if host else referrer[:64]
+
+
+def _activity_view(rows: list) -> list[dict]:
+    """Render data for the Live-activity panel rows."""
+    return [
+        {
+            "code": code,
+            "when": _fmt_rel(click.clicked_at),
+            "when_abs": _fmt_abs(click.clicked_at),
+            "device": click.device or "other",
+            "referrer_host": _referrer_host(click.referrer),
+            "ip_hash": (click.ip_hash or "")[:12] or None,
+        }
+        for click, code in rows
+    ]
+
+
+def _trend_label(current: int, previous: int) -> dict | None:
+    """Chip data comparing this week's clicks with the previous week."""
+    if previous <= 0 and current <= 0:
+        return None
+    if previous == 0:
+        return {"direction": "up", "pct": "new", "title": f"{current} this week vs 0 before"}
+    pct = round((current - previous) * 100 / previous)
+    if pct > 0:
+        return {"direction": "up", "pct": f"+{pct}%", "title": f"{pct}% vs previous week"}
+    if pct < 0:
+        return {"direction": "down", "pct": f"{pct}%", "title": f"{pct}% vs previous week"}
+    return {"direction": "flat", "pct": "±0%", "title": "same as previous week"}
 
 
 def _device_panel(
@@ -211,6 +256,10 @@ async def dashboard(
         "device_days": DEVICE_PANEL_DAYS,
         "devices": [],
         "devices_total": 0,
+        "activity": [],
+        "activity_total": 0,
+        "trend": None,
+        "unique_visitors": 0,
     }
     try:
         total_links = int(
@@ -231,10 +280,26 @@ async def dashboard(
         offset = (page - 1) * per_page
 
         base_url = str(request.base_url).rstrip("/")
-        entries, clicks_7d = await _links_with_counts(
+        entries, _ = await _links_with_counts(
             db, base_url, limit=per_page, offset=offset
         )
-        context["summary"]["clicks_7d"] = clicks_7d
+
+        # Trend chip: this week vs previous week from one 14-day grouped query.
+        page_link_ids = list(
+            (
+                await db.execute(
+                    select(Link.id)
+                    .order_by(Link.created_at.desc(), Link.id.desc())
+                    .offset(offset)
+                    .limit(per_page)
+                )
+            ).scalars().all()
+        )
+        series_14d = await get_daily_clicks_for_links(db, page_link_ids, days=DELTA_WINDOW_DAYS)
+        current_week = sum(sum(points[7:]) for points in series_14d.values())
+        previous_week = sum(sum(points[:7]) for points in series_14d.values())
+        context["summary"]["clicks_7d"] = current_week
+        context["trend"] = _trend_label(current_week, previous_week)
         if sort == "clicks":
             entries.sort(key=lambda item: item["clicks"], reverse=True)
         context["links"] = entries
@@ -261,6 +326,11 @@ async def dashboard(
         )
         context["devices"] = _device_panel(dev_items, dev_total)
         context["devices_total"] = dev_total
+
+        context["unique_visitors"] = await count_unique_clicks_global(db)
+        activity_rows = await get_recent_clicks_global(db, link_ids=None, limit=ACTIVITY_ROWS)
+        context["activity"] = _activity_view(activity_rows)
+        context["activity_total"] = len(context["activity"])
 
         if code:
             link = await db.scalar(select(Link).where(Link.code == code))

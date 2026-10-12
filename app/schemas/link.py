@@ -82,6 +82,10 @@ class StatsOut(BaseModel):
     code: str
     original_url: str
     total_clicks: int
+    unique_clicks: int = Field(
+        default=0,
+        description="Distinct visitors (unique ip_hash) across all clicks.",
+    )
     created_at: datetime
 
 
@@ -174,6 +178,14 @@ class LinkDetailOut(LinkOut):
         default_factory=list,
         description="All-time device mix for this link, ranked by clicks.",
     )
+    unique_clicks: int = Field(
+        default=0,
+        description="Distinct visitors (unique ip_hash) across all clicks.",
+    )
+    daily_14d: list[int] = Field(
+        default_factory=list,
+        description="Clicks per day for the last 14 days, oldest → newest, zero-filled.",
+    )
 
 
 class LinkPageOut(BaseModel):
@@ -196,3 +208,25 @@ class SparklineItem(BaseModel):
 class SparklinesOut(BaseModel):
     window_days: int
     items: list[SparklineItem]
+
+
+class ActivityItem(BaseModel):
+    """One recent click in the global activity feed."""
+
+    code: str
+    clicked_at: datetime
+    device: str = Field(description="desktop | mobile | tablet | bot | other")
+    referrer_host: str | None = Field(
+        default=None,
+        description="Host of the referer (privacy-safe); None means direct.",
+    )
+    ip_hash: str | None = Field(
+        default=None, description="Truncated (12 chars) hashed visitor IP."
+    )
+
+
+class ActivityOut(BaseModel):
+    """Envelope for GET /api/stats/activity."""
+
+    items: list[ActivityItem]
+    limit: int

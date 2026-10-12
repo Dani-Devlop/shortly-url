@@ -1,8 +1,9 @@
 """Click analytics endpoints (owner-only): totals, daily series, sparklines,
-global device mix, windowed referrers, per-link CSV export."""
+global device mix, windowed referrers, global activity feed, per-link CSV."""
 
 import csv
 import io
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import select
@@ -13,6 +14,8 @@ from app.core.exceptions import NotFoundError
 from app.db.session import get_db
 from app.models import Link, User
 from app.schemas.link import (
+    ActivityItem,
+    ActivityOut,
     DailyStatPoint,
     DailyStats,
     DeviceBreakdownOut,
@@ -25,10 +28,12 @@ from app.schemas.link import (
 )
 from app.services.link_service import get_link_by_code
 from app.services.stats_service import (
+    count_unique_clicks,
     get_daily_clicks,
     get_daily_clicks_for_links,
     get_device_breakdown_global,
     get_recent_clicks,
+    get_recent_clicks_global,
     get_referrer_stats,
     get_total_clicks,
 )
@@ -36,6 +41,17 @@ from app.services.stats_service import (
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
 EXPORT_CLICKS_CAP = 10_000
+
+
+def _referrer_host(referrer: str | None) -> str | None:
+    """Reduce a stored referer to its host (privacy-safe display form)."""
+    if not referrer:
+        return None
+    try:
+        host = urlparse(referrer).netloc
+    except ValueError:
+        return referrer[:64]
+    return host[:64] if host else referrer[:64]
 
 
 async def _owned_link(db: AsyncSession, code: str, user: User):
@@ -100,18 +116,50 @@ async def devices(
     )
 
 
+@router.get("/activity", response_model=ActivityOut)
+async def activity_feed(
+    limit: int = Query(default=20, ge=1, le=100),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ActivityOut:
+    """The caller's most recent clicks across all their links (newest first).
+
+    NOTE: registered before ``/{code}`` so "activity" is never read as a code.
+    Referrers are reduced to their host and IP hashes are truncated to 12
+    characters, mirroring the detail view's privacy posture.
+    """
+    link_ids = list(
+        (
+            await db.execute(select(Link.id).where(Link.owner_id == user.id))
+        ).scalars().all()
+    )
+    rows = await get_recent_clicks_global(db, link_ids=link_ids, limit=limit)
+    items = [
+        ActivityItem(
+            code=code,
+            clicked_at=click.clicked_at,
+            device=click.device or "other",
+            referrer_host=_referrer_host(click.referrer),
+            ip_hash=click.ip_hash[:12] if click.ip_hash else None,
+        )
+        for click, code in rows
+    ]
+    return ActivityOut(items=items, limit=limit)
+
+
 @router.get("/{code}", response_model=StatsOut)
 async def link_stats(
     code: str,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> StatsOut:
-    """Total clicks for a link."""
+    """Total and unique clicks for a link."""
     link = await _owned_link(db, code, user)
     return StatsOut(
         code=link.code,
         original_url=link.original_url,
         total_clicks=await get_total_clicks(db, link),
+        unique_clicks=await count_unique_clicks(db, link.id),
         created_at=link.created_at,
     )
 

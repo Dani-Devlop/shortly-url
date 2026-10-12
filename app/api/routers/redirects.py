@@ -15,7 +15,7 @@ from app.core.config import get_settings
 from app.core.exceptions import NotFoundError
 from app.db.session import get_session_factory
 from app.services.click_service import click_task
-from app.services.redirect_service import resolve_target
+from app.services.redirect_service import merge_query, resolve_target
 
 router = APIRouter(tags=["redirect"])
 
@@ -44,8 +44,12 @@ async def redirect_by_code(
     async with get_session_factory()() as db:
         payload, cache_hit = await resolve_target(db, code)
 
+    # Query-param forwarding: /abc?utm_source=x redirects to the destination
+    # with utm_source=x appended (incoming wins over same-named params).
+    target = merge_query(payload["url"], request.url.query)
+
     return RedirectResponse(
-        url=payload["url"],
+        url=target,
         status_code=302,  # 302 (not 301) so browsers don't cache past analytics
         headers={
             "Cache-Control": "no-store",
