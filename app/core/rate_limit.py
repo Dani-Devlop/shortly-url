@@ -10,16 +10,19 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-async def enforce_rate_limit(identifier: str) -> None:
-    """Raise :class:`RateLimitError` when the caller exceeds the configured budget."""
+async def enforce_rate_limit(identifier: str, *, cost: int = 1) -> None:
+    """Raise :class:`RateLimitError` when the caller exceeds the configured budget.
+
+    ``cost`` lets heavier requests (e.g. bulk shorten) consume several units.
+    """
     redis = get_redis()
     if redis is None:
         return  # fail open — availability over strictness
     key = f"shortly:rl:{identifier}"
     window = max(1, settings.rate_limit_window_seconds)
     try:
-        count = await redis.incr(key)
-        if count == 1:
+        count = await redis.incr(key, max(1, cost))
+        if count == max(1, cost):  # first hit in this window → (re)arm expiry
             await redis.expire(key, window)
         if count > settings.rate_limit_requests:
             ttl = await redis.ttl(key)

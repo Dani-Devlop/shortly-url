@@ -81,3 +81,38 @@ async def get_recent_clicks(
         .limit(limit)
     )
     return list(rows.scalars().all())
+
+
+async def get_daily_clicks_for_links(
+    db: AsyncSession, link_ids: list[int], days: int = 7
+) -> dict[int, list[int]]:
+    """Zero-filled per-day click series for several links in one query.
+
+    Returns ``{link_id: [oldest, ..., newest]}`` with exactly ``days`` buckets.
+    Portable across PG/SQLite via ``func.date()``.
+    """
+    if not link_ids:
+        return {}
+    cutoff = datetime.now(UTC) - timedelta(days=days - 1)
+    # Normalise the cutoff to the start of that day so the window is inclusive.
+    cutoff = cutoff.replace(hour=0, minute=0, second=0, microsecond=0)
+    day = func.date(Click.clicked_at)
+    rows = await db.execute(
+        select(Click.link_id, day.label("day"), func.count().label("clicks"))
+        .where(Click.link_id.in_(link_ids), Click.clicked_at >= cutoff)
+        .group_by(Click.link_id, day)
+    )
+    by_day: dict[int, dict[str, int]] = {}
+    for link_id, day_value, clicks in rows.all():
+        by_day.setdefault(int(link_id), {})[str(day_value)] = int(clicks)
+
+    today = datetime.now(UTC).date()
+    series: dict[int, list[int]] = {}
+    for link_id in link_ids:
+        counts = by_day.get(link_id, {})
+        points = []
+        for offset in range(days - 1, -1, -1):
+            day_key = str(today - timedelta(days=offset))
+            points.append(counts.get(day_key, 0))
+        series[link_id] = points
+    return series

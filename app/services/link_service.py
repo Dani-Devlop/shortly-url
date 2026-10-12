@@ -1,6 +1,7 @@
 """Link business logic: creation, lookup, deletion, URL validation."""
 
 import logging
+from datetime import datetime
 from urllib.parse import urlparse
 
 from sqlalchemy import select
@@ -21,6 +22,13 @@ RESERVED_CODES = {
 }
 
 MAX_CODE_ATTEMPTS = 10
+
+
+class LinkExpiryUnset:
+    """Sentinel type — 'do not touch the expiry' (distinct from explicit None)."""
+
+
+_UNSET = LinkExpiryUnset()
 
 
 def _host_of(url: str) -> str:
@@ -54,12 +62,22 @@ async def _generate_unique_code(db: AsyncSession) -> str:
     )
 
 
+def _cache_payload(link: Link) -> dict:
+    """Redis cache shape for a link. ``exp`` is an ISO string or None."""
+    return {
+        "url": link.original_url,
+        "id": link.id,
+        "exp": link.expires_at.isoformat() if link.expires_at else None,
+    }
+
+
 async def create_link(
     db: AsyncSession,
     *,
     original_url: str,
     owner_id: int,
     custom_code: str | None = None,
+    expires_at: datetime | None = None,
 ) -> Link:
     """Create a link. Duplicate URLs from the same owner return the existing link."""
     validate_target_url(original_url)
@@ -79,14 +97,14 @@ async def create_link(
     else:
         code = await _generate_unique_code(db)
 
-    link = Link(code=code, original_url=original_url, owner_id=owner_id)
+    link = Link(code=code, original_url=original_url, owner_id=owner_id, expires_at=expires_at)
     db.add(link)
     await db.commit()
     await db.refresh(link)
     # Best-effort cache warm so the very first redirect is already hot.
     await cache_set(
         f"shortly:short:{code}",
-        {"url": link.original_url, "id": link.id},
+        _cache_payload(link),
         settings.cache_ttl_seconds,
     )
     logger.info("created link code=%s owner_id=%s", code, owner_id)
@@ -102,13 +120,34 @@ async def delete_link(db: AsyncSession, link: Link) -> None:
     logger.info("deleted link code=%s", code)
 
 
-async def update_destination(db: AsyncSession, link: Link, new_url: str) -> Link:
-    """Point an existing short code at a new destination and invalidate its cache."""
-    validate_target_url(new_url)
-    link.original_url = new_url
-    db.add(link)
-    await db.commit()
-    await db.refresh(link)
-    await cache_delete(f"shortly:short:{link.code}")
-    logger.info("updated destination code=%s", link.code)
+async def update_link(
+    db: AsyncSession,
+    link: Link,
+    *,
+    new_url: str | None = None,
+    expires_at: datetime | None | LinkExpiryUnset = _UNSET,
+) -> Link:
+    """Update destination and/or expiry, then invalidate the link's cache.
+
+    ``expires_at`` accepts:
+    - ``_UNSET`` (default): leave the expiry untouched
+    - ``None``: clear the expiry
+    - a datetime: set the expiry
+    """
+    changed = False
+    if new_url is not None:
+        validate_target_url(new_url)
+        if link.original_url != new_url:
+            link.original_url = new_url
+            changed = True
+    if not isinstance(expires_at, LinkExpiryUnset):
+        if link.expires_at != expires_at:
+            link.expires_at = expires_at
+            changed = True
+    if changed:
+        db.add(link)
+        await db.commit()
+        await db.refresh(link)
+        await cache_delete(f"shortly:short:{link.code}")
+        logger.info("updated link code=%s", link.code)
     return link

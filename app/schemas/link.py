@@ -1,8 +1,19 @@
 """Pydantic v2 request/response schemas."""
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
+
+
+def _ensure_future(value: datetime | None) -> datetime | None:
+    """Reject expiry timestamps that are already in the past (1s clock slack)."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    if value <= datetime.now(UTC) + timedelta(seconds=1):
+        raise ValueError("expires_at must be in the future")
+    return value
 
 
 class ShortenRequest(BaseModel):
@@ -19,6 +30,40 @@ class ShortenRequest(BaseModel):
         examples=["my-link"],
         description="Optional custom alias: 4–16 chars, letters/digits/-/_ only.",
     )
+    expires_at: datetime | None = Field(
+        default=None,
+        description="Optional expiry timestamp (ISO 8601). Expired links return 410 Gone.",
+    )
+
+    @model_validator(mode="after")
+    def _validate_expiry(self) -> "ShortenRequest":
+        self.expires_at = _ensure_future(self.expires_at)
+        return self
+
+
+class BulkShortenRequest(BaseModel):
+    urls: list[HttpUrl] = Field(
+        ...,
+        min_length=1,
+        max_length=25,
+        examples=[["https://example.com/a", "https://example.com/b"]],
+        description="1–25 URLs to shorten in one call.",
+    )
+
+
+class BulkResultItem(BaseModel):
+    url: str
+    status: str  # created | duplicate | error
+    code: str | None = None
+    short_url: str | None = None
+    error: str | None = None
+
+
+class BulkShortenOut(BaseModel):
+    results: list[BulkResultItem]
+    created: int
+    duplicate: int
+    errors: int
 
 
 class LinkOut(BaseModel):
@@ -29,6 +74,7 @@ class LinkOut(BaseModel):
     short_url: str
     original_url: str
     created_at: datetime
+    expires_at: datetime | None = None
     total_clicks: int = 0
 
 
@@ -52,11 +98,26 @@ class DailyStats(BaseModel):
 
 
 class LinkUpdate(BaseModel):
-    url: HttpUrl = Field(
-        ...,
+    url: HttpUrl | None = Field(
+        default=None,
         examples=["https://example.com/new/destination"],
         description="New destination URL (http/https, max 2048 chars).",
     )
+    expires_at: datetime | None = Field(
+        default=None,
+        description="New expiry timestamp. Send null to remove the expiry."
+    )
+
+    @model_validator(mode="after")
+    def _validate(self) -> "LinkUpdate":
+        provided = self.model_fields_set
+        if "url" in provided and self.url is None:
+            raise ValueError("url cannot be null")
+        if not provided & {"url", "expires_at"}:
+            raise ValueError("provide at least one of 'url' or 'expires_at'")
+        if "expires_at" in provided:
+            self.expires_at = _ensure_future(self.expires_at)
+        return self
 
 
 class RecentClickOut(BaseModel):
@@ -70,3 +131,16 @@ class LinkDetailOut(LinkOut):
         default_factory=list,
         description="Most recent clicks (max 20), newest first.",
     )
+
+
+class SparklineItem(BaseModel):
+    code: str
+    total_clicks: int
+    points: list[int] = Field(
+        description="Click counts per day, oldest → newest, zero-filled.",
+    )
+
+
+class SparklinesOut(BaseModel):
+    window_days: int
+    items: list[SparklineItem]
