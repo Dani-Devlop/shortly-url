@@ -1,28 +1,100 @@
-"""Application entrypoint.
+"""Application entrypoint — app factory, exception handlers, router wiring."""
 
-Kept intentionally thin: the FastAPI app is assembled in ``create_app``.
-Routers, middleware and exception handlers are added milestone by milestone.
-"""
-
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from app.api.routers import health, links, redirects, stats
+from app.core.config import get_settings
+from app.core.exceptions import AppError
+from app.db.bootstrap import ensure_master_user
+
+settings = get_settings()
+
+logging.basicConfig(
+    level=settings.log_level.upper(),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger("shortly")
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    await ensure_master_user()
+    logger.info("%s started (env=%s)", settings.project_name, settings.environment)
     yield
+    logger.info("%s shutting down", settings.project_name)
 
 
-app = FastAPI(
-    title="shortly-url",
-    description="Fast link shortener with click analytics.",
-    version="0.1.0",
-    lifespan=lifespan,
-)
+def _error_body(code: str, message: str) -> dict:
+    return {"error": {"code": code, "message": message}}
 
 
-@app.get("/health", tags=["health"])
-async def health() -> dict:
-    """Liveness probe (expanded to a DB/Redis readiness probe in later milestones)."""
-    return {"status": "ok", "service": "shortly-url"}
+def create_app() -> FastAPI:
+    application = FastAPI(
+        title="shortly-url",
+        description="Fast link shortener with click analytics.",
+        version="1.0.0",
+        lifespan=lifespan,
+    )
+
+    # Order matters: the catch-all /{code} redirect route must be registered LAST.
+    application.include_router(health.router)
+    application.include_router(links.router)
+    application.include_router(stats.router)
+    application.include_router(redirects.router)
+
+    @application.exception_handler(AppError)
+    async def handle_app_error(_: Request, exc: AppError) -> JSONResponse:
+        headers = {}
+        retry_after = getattr(exc, "retry_after", None)
+        if retry_after:
+            headers["Retry-After"] = str(retry_after)
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=_error_body(exc.code, exc.message),
+            headers=headers,
+        )
+
+    @application.exception_handler(StarletteHTTPException)
+    async def handle_http_exception(
+        _: Request, exc: StarletteHTTPException
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=_error_body("http_error", str(exc.detail)),
+            headers=getattr(exc, "headers", None) or {},
+        )
+
+    @application.exception_handler(RequestValidationError)
+    async def handle_validation_error(
+        _: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        details = [
+            {
+                "loc": ".".join(str(part) for part in err.get("loc", [])),
+                "msg": err.get("msg"),
+                "type": err.get("type"),
+            }
+            for err in exc.errors()
+        ]
+        body = _error_body("validation_error", "Request validation failed")
+        body["error"]["details"] = details
+        return JSONResponse(status_code=422, content=body)
+
+    @application.exception_handler(Exception)
+    async def handle_unexpected(_: Request, exc: Exception) -> JSONResponse:
+        logger.exception("unhandled error: %s", exc)
+        return JSONResponse(
+            status_code=500,
+            content=_error_body("internal_error", "An unexpected error occurred"),
+        )
+
+    return application
+
+
+app = create_app()
