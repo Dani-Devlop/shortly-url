@@ -47,6 +47,40 @@
       }
     },
     {
+      "name": "Bulk Shorten",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.test('results is an array', () => pm.expect(body.results).to.be.an('array'));",
+              "pm.test('counts add up', () => pm.expect(body.results.length).to.eql(body.created + body.duplicate + body.errors));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-API-Key", "value": "{{apiKey}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"urls\": [\n    \"https://example.com/bulk/one\",\n    \"https://example.com/bulk/two\",\n    \"https://example.com/bulk/three\"\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/shorten/bulk",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "shorten", "bulk"]
+        },
+        "description": "Shorten 1–25 URLs in one call. Each item reports created / duplicate / error independently. Consumes one rate-limit unit per URL."
+      }
+    },
+    {
       "name": "Redirect (no follow)",
       "event": [
         {
@@ -97,6 +131,37 @@
       }
     },
     {
+      "name": "Stats — Sparklines",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('items is an array', () => pm.expect(body.items).to.be.an('array'));",
+              "pm.test('points are zero-filled per window', () => pm.expect(body.items[0].points.length).to.eql(body.window_days));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/stats/sparklines?days=7",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "stats", "sparklines"],
+          "query": [
+            { "key": "days", "value": "7", "description": "Window length: 1–30 days" },
+            { "key": "limit", "value": "50", "description": "Max links returned" }
+          ]
+        },
+        "description": "Per-link zero-filled daily click series (oldest → newest), newest links first."
+      }
+    },
+    {
       "name": "Stats — Daily Clicks",
       "event": [
         {
@@ -120,6 +185,58 @@
           "path": ["api", "stats", "{{code}}", "daily"],
           "query": [{ "key": "days", "value": "14", "description": "Rolling window: 1–90 days" }]
         }
+      }
+    },
+    {
+      "name": "Export — Clicks CSV",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('Content is CSV', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv'));",
+              "pm.test('Has header row', () => pm.expect(pm.response.text().split('\\n')[0]).to.eql('clicked_at,ip_hash,user_agent'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/stats/{{code}}/export",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "stats", "{{code}}", "export"]
+        },
+        "description": "CSV download of every individual click (capped at 10,000 rows). IP hashes are truncated to 12 chars for privacy."
+      }
+    },
+    {
+      "name": "Export — Links CSV",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('Content is CSV', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv'));",
+              "pm.test('Attachment disposition', () => pm.expect(pm.response.headers.get('Content-Disposition')).to.include('attachment'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/links/export",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "links", "export"]
+        },
+        "description": "CSV download of all the authenticated user's links (capped at 5,000 rows) with click counts."
       }
     },
     {
@@ -195,14 +312,14 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{ \"url\": \"https://example.com/updated/destination\" }"
+          "raw": "{\n  \"url\": \"https://example.com/updated/destination\",\n  \"expires_at\": null\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/links/{{code}}",
           "host": ["{{baseUrl}}"],
           "path": ["api", "links", "{{code}}"]
         },
-        "description": "Point the short code at a new destination. The cached redirect mapping is invalidated automatically."
+        "description": "Point the short code at a new destination and/or set `expires_at` (ISO 8601; send null to clear). The cached redirect mapping is invalidated automatically."
       }
     },
     {
