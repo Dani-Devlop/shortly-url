@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>shortly-url · dashboard</title>
+  <style>
+    :root {
+      --bg: #0f172a; --card: #1e293b; --accent: #34d399; --text: #e2e8f0;
+      --muted: #94a3b8; --danger: #f87171; --border: rgba(148, 163, 184, .15);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh;
+      display: flex; flex-direction: column;
+    }
+    header {
+      padding: 1.25rem 2rem; display: flex; justify-content: space-between;
+      align-items: center; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: .5rem;
+    }
+    .logo { font-size: 1.35rem; font-weight: 700; }
+    .logo span { color: var(--accent); }
+    .tagline { color: var(--muted); font-size: .85rem; }
+    main { flex: 1; width: 100%; max-width: 1000px; margin: 0 auto; padding: 2rem 1rem; }
+    .cards {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 1rem; margin-bottom: 1.5rem;
+    }
+    .card { background: var(--card); border-radius: 12px; padding: 1.25rem; }
+    .card .value { font-size: 2rem; font-weight: 700; color: var(--accent); }
+    .card .label { color: var(--muted); font-size: .85rem; margin-top: .25rem; }
+    form.search { display: flex; gap: .5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    input {
+      flex: 1; min-width: 200px; padding: .7rem .95rem; border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, .3); background: #0b1220; color: var(--text);
+    }
+    input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    button {
+      padding: .7rem 1.25rem; border: 0; border-radius: 10px; background: var(--accent);
+      color: #052e1a; font-weight: 600; cursor: pointer; min-height: 44px;
+    }
+    button:hover { filter: brightness(1.08); }
+    .panel {
+      background: var(--card); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem;
+      overflow-wrap: anywhere;
+    }
+    .badge {
+      display: inline-block; background: rgba(52, 211, 153, .12); color: var(--accent);
+      padding: .15rem .6rem; border-radius: 999px; font-size: .85rem; font-weight: 600;
+    }
+    .table-wrap {
+      overflow-x: auto; background: var(--card); border-radius: 12px;
+      max-height: 26rem; overflow-y: auto;
+    }
+    table { width: 100%; border-collapse: collapse; min-width: 640px; }
+    th, td {
+      padding: .75rem 1rem; text-align: left;
+      border-bottom: 1px solid var(--border); font-size: .9rem;
+    }
+    th {
+      color: var(--muted); font-weight: 600; text-transform: uppercase;
+      font-size: .72rem; letter-spacing: .05em; position: sticky; top: 0;
+      background: var(--card); z-index: 1;
+    }
+    td a { color: var(--accent); text-decoration: none; }
+    td a:hover { text-decoration: underline; }
+    .url-cell { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .muted { color: var(--muted); }
+    .error { color: var(--danger); }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    footer {
+      margin-top: auto; padding: 1rem 2rem; text-align: center; color: var(--muted);
+      font-size: .8rem; border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    @media (max-width: 640px) {
+      header, footer { padding-left: 1rem; padding-right: 1rem; }
+      .url-cell { max-width: 160px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo">shortly<span>-url</span> ⚡</div>
+  <div class="tagline">link shortener · live panel</div>
+</header>
+
+<main>
+  {% if error %}
+    <section class="panel error">{{ error }}</section>
+  {% else %}
+    <section class="cards">
+      <div class="card">
+        <div class="value">{{ summary.total_links }}</div>
+        <div class="label">Short links</div>
+      </div>
+      <div class="card">
+        <div class="value">{{ summary.total_clicks }}</div>
+        <div class="label">Total clicks</div>
+      </div>
+    </section>
+
+    <form class="search" method="get" action="/">
+      <input name="code" placeholder="Look up a short code (e.g. aB3xK9m)" value="{{ lookup }}" aria-label="Short code">
+      <button type="submit">Check stats</button>
+    </form>
+
+    {% if lookup %}
+      {% if selected %}
+        <section class="panel">
+          <h2 style="margin-bottom:.5rem">Stats for <span class="badge">{{ selected.code }}</span></h2>
+          <p class="muted">→ {{ selected.original_url }}</p>
+          <p style="margin-top:.5rem">Total clicks: <strong>{{ selected.total_clicks }}</strong> · created {{ selected.created_at }}</p>
+        </section>
+      {% else %}
+        <section class="panel error">No link found for code “{{ lookup }}”.</section>
+      {% endif %}
+    {% endif %}
+
+    <section class="table-wrap" aria-label="Recent links">
+      <table>
+        <thead>
+          <tr><th>Code</th><th>Original URL</th><th>Clicks</th><th>Created</th></tr>
+        </thead>
+        <tbody>
+          {% for l in links %}
+            <tr>
+              <td><a href="/{{ l.code }}" target="_blank" rel="noopener noreferrer">{{ l.code }}</a></td>
+              <td class="url-cell" title="{{ l.original_url }}">
+                <a href="{{ l.original_url }}" target="_blank" rel="noopener noreferrer">{{ l.original_url }}</a>
+              </td>
+              <td>{{ l.clicks }}</td>
+              <td class="muted">{{ l.created_at }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" class="muted">No links yet — create one via <code>POST /api/shorten</code>.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  {% endif %}
+</main>
+
+<footer>
+  shortly-url · FastAPI + PostgreSQL + Redis ·
+  <a href="https://github.com/Dani-Devlop/shortly-url" target="_blank" rel="noopener noreferrer">GitHub</a>
+</footer>
+</body>
+</html>

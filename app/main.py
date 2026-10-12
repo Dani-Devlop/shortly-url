@@ -8,7 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api.routers import health, links, redirects, stats
+from app.api.routers import health, links, pages, redirects, stats
 from app.core.config import get_settings
 from app.core.exceptions import AppError
 from app.core.redis import close_redis, init_redis
@@ -47,6 +47,7 @@ def create_app() -> FastAPI:
 
     # Order matters: the catch-all /{code} redirect route must be registered LAST.
     application.include_router(health.router)
+    application.include_router(pages.router)
     application.include_router(links.router)
     application.include_router(stats.router)
     application.include_router(redirects.router)
