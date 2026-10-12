@@ -1,0 +1,62 @@
+services:
+  api:
+    build: .
+    container_name: shortly-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://shortly:shortly@db:5432/shortly
+      REDIS_URL: redis://redis:6379/0
+      BASE_URL: ${BASE_URL:-http://localhost:8000}
+      MASTER_API_KEY: ${MASTER_API_KEY:-local-dev-master-key}
+      IP_HASH_SALT: ${IP_HASH_SALT:-local-dev-ip-salt}
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-10}
+      RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-60}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  db:
+    image: postgres:16-alpine
+    container_name: shortly-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: shortly
+      POSTGRES_PASSWORD: shortly
+      POSTGRES_DB: shortly
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shortly -d shortly"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: shortly-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
