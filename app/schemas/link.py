@@ -124,6 +124,15 @@ class RecentClickOut(BaseModel):
     clicked_at: datetime
     ip_hash: str | None = None
     user_agent: str | None = None
+    referrer: str | None = Field(
+        default=None,
+        description="Referer of the click; null means direct (no referrer).",
+    )
+
+
+class ReferrerStat(BaseModel):
+    source: str = Field(description="Referrer URL, or 'direct' when the header was absent.")
+    clicks: int
 
 
 class LinkDetailOut(LinkOut):
@@ -131,6 +140,19 @@ class LinkDetailOut(LinkOut):
         default_factory=list,
         description="Most recent clicks (max 20), newest first.",
     )
+    top_referrers: list[ReferrerStat] = Field(
+        default_factory=list,
+        description="Traffic sources ranked by clicks (max 5).",
+    )
+
+
+class LinkPageOut(BaseModel):
+    """Paginated envelope for GET /api/links."""
+
+    items: list[LinkOut]
+    total: int = Field(description="Total links owned by the user (all pages).")
+    limit: int
+    offset: int
 
 
 class SparklineItem(BaseModel):

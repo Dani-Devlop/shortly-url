@@ -16,7 +16,13 @@ from app.models import Click
 logger = logging.getLogger(__name__)
 
 
-async def record_click(link_id: int, code: str, ip: str | None, user_agent: str | None) -> None:
+async def record_click(
+    link_id: int,
+    code: str,
+    ip: str | None,
+    user_agent: str | None,
+    referrer: str | None = None,
+) -> None:
     try:
         async with get_session_factory()() as session:
             session.add(
@@ -24,6 +30,7 @@ async def record_click(link_id: int, code: str, ip: str | None, user_agent: str 
                     link_id=link_id,
                     ip_hash=hash_ip(ip),
                     user_agent=user_agent[:512] if user_agent else None,
+                    referrer=referrer[:512] if referrer else None,
                 )
             )
             await session.commit()
@@ -32,11 +39,18 @@ async def record_click(link_id: int, code: str, ip: str | None, user_agent: str 
         logger.exception("failed to record click for code=%s", code)
 
 
-def click_task(link_id: int, code: str, ip: str | None, user_agent: str | None) -> BackgroundTask:
+def click_task(
+    link_id: int,
+    code: str,
+    ip: str | None,
+    user_agent: str | None,
+    referrer: str | None = None,
+) -> BackgroundTask:
     return BackgroundTask(
         record_click,
         link_id=link_id,
         code=code,
         ip=ip,
         user_agent=user_agent,
+        referrer=referrer,
     )

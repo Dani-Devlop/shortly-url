@@ -62,4 +62,4 @@ async def test_unknown_api_route_returns_json_error(client):
 async def test_master_user_can_authenticate(client):
     response = await client.get("/api/links", headers=AUTH_HEADERS)
     assert response.status_code == 200
-    assert isinstance(response.json(), list)
+    assert isinstance(response.json()["items"], list)

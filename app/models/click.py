@@ -21,6 +21,8 @@ class Click(Base):
     # Privacy: salted SHA-256 of the visitor IP — never the raw address.
     ip_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # Page that sent the visitor (Referer header), truncated — None = direct.
+    referrer: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     link = relationship("Link", back_populates="clicks")
 

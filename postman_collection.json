@@ -6,9 +6,18 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8000" },
-    { "key": "apiKey", "value": "change-me-master-key" },
-    { "key": "code", "value": "aB3xK9m" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "apiKey",
+      "value": "change-me-master-key"
+    },
+    {
+      "key": "code",
+      "value": "aB3xK9m"
+    }
   ],
   "item": [
     {
@@ -31,8 +40,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "X-API-Key", "value": "{{apiKey}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -40,8 +55,13 @@
         },
         "url": {
           "raw": "{{baseUrl}}/api/shorten",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "shorten"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "shorten"
+          ]
         },
         "description": "Create a short link. Duplicate URLs from the same owner return the existing link. Optional `custom_code` must be 4–16 chars (letters/digits/-/_)."
       }
@@ -65,8 +85,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "X-API-Key", "value": "{{apiKey}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -74,8 +100,14 @@
         },
         "url": {
           "raw": "{{baseUrl}}/api/shorten/bulk",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "shorten", "bulk"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "shorten",
+            "bulk"
+          ]
         },
         "description": "Shorten 1–25 URLs in one call. Each item reports created / duplicate / error independently. Consumes one rate-limit unit per URL."
       }
@@ -99,8 +131,12 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/{{code}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["{{code}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "{{code}}"
+          ]
         },
         "description": "Follow the short link. Each call records a click asynchronously (background task)."
       }
@@ -122,11 +158,22 @@
       ],
       "request": {
         "method": "GET",
-        "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
         "url": {
           "raw": "{{baseUrl}}/api/stats/{{code}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "stats", "{{code}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "stats",
+            "{{code}}"
+          ]
         }
       }
     },
@@ -148,14 +195,33 @@
       ],
       "request": {
         "method": "GET",
-        "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
         "url": {
           "raw": "{{baseUrl}}/api/stats/sparklines?days=7",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "stats", "sparklines"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "stats",
+            "sparklines"
+          ],
           "query": [
-            { "key": "days", "value": "7", "description": "Window length: 1–30 days" },
-            { "key": "limit", "value": "50", "description": "Max links returned" }
+            {
+              "key": "days",
+              "value": "7",
+              "description": "Window length: 1–30 days"
+            },
+            {
+              "key": "limit",
+              "value": "50",
+              "description": "Max links returned"
+            }
           ]
         },
         "description": "Per-link zero-filled daily click series (oldest → newest), newest links first."
@@ -178,12 +244,30 @@
       ],
       "request": {
         "method": "GET",
-        "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
         "url": {
           "raw": "{{baseUrl}}/api/stats/{{code}}/daily?days=14",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "stats", "{{code}}", "daily"],
-          "query": [{ "key": "days", "value": "14", "description": "Rolling window: 1–90 days" }]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "stats",
+            "{{code}}",
+            "daily"
+          ],
+          "query": [
+            {
+              "key": "days",
+              "value": "14",
+              "description": "Rolling window: 1–90 days"
+            }
+          ]
         }
       }
     },
@@ -204,13 +288,25 @@
       ],
       "request": {
         "method": "GET",
-        "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
         "url": {
           "raw": "{{baseUrl}}/api/stats/{{code}}/export",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "stats", "{{code}}", "export"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "stats",
+            "{{code}}",
+            "export"
+          ]
         },
-        "description": "CSV download of every individual click (capped at 10,000 rows). IP hashes are truncated to 12 chars for privacy."
+        "description": "CSV download of a link's individual clicks (newest first, capped at 10k rows). Columns: clicked_at, ip_hash (truncated), user_agent, referrer."
       }
     },
     {
@@ -230,11 +326,22 @@
       ],
       "request": {
         "method": "GET",
-        "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
         "url": {
           "raw": "{{baseUrl}}/api/links/export",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "links", "export"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "links",
+            "export"
+          ]
         },
         "description": "CSV download of all the authenticated user's links (capped at 5,000 rows) with click counts."
       }
@@ -247,21 +354,52 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
-              "pm.test('Body is an array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+              "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test(\"paginated envelope\", () => {",
+              "  pm.expect(body).to.have.property('items');",
+              "  pm.expect(body).to.have.property('total');",
+              "  pm.expect(body).to.have.property('limit');",
+              "  pm.expect(body).to.have.property('offset');",
+              "});",
+              "if (body.items && body.items.length) {",
+              "  pm.collectionVariables.set('code', body.items[0].code);",
+              "}"
             ]
           }
         }
       ],
       "request": {
         "method": "GET",
-        "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
         "url": {
           "raw": "{{baseUrl}}/api/links?limit=50",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "links"],
-          "query": [{ "key": "limit", "value": "50" }]
-        }
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "links"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "20",
+              "description": "1–100 (default 20)"
+            },
+            {
+              "key": "offset",
+              "value": "0",
+              "description": "0-based"
+            }
+          ]
+        },
+        "description": "Paginated list of the authenticated user's links.\n\nReturns `{items, total, limit, offset}` — `total` counts all the user's links."
       }
     },
     {
@@ -281,13 +419,24 @@
       ],
       "request": {
         "method": "GET",
-        "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
         "url": {
           "raw": "{{baseUrl}}/api/links/{{code}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "links", "{{code}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "links",
+            "{{code}}"
+          ]
         },
-        "description": "Full detail for one link, including the 20 most recent clicks (hashed IP prefix + user agent)."
+        "description": "Full detail for one link: metadata, the 20 most recent clicks (hashed IP prefix, user agent, referrer) and the all-time top-5 traffic sources."
       }
     },
     {
@@ -307,8 +456,14 @@
       "request": {
         "method": "PATCH",
         "header": [
-          { "key": "X-API-Key", "value": "{{apiKey}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -316,14 +471,20 @@
         },
         "url": {
           "raw": "{{baseUrl}}/api/links/{{code}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "links", "{{code}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "links",
+            "{{code}}"
+          ]
         },
         "description": "Point the short code at a new destination and/or set `expires_at` (ISO 8601; send null to clear). The cached redirect mapping is invalidated automatically."
       }
     },
     {
-      "name": "QR Code (SVG)",
+      "name": "QR Code (SVG/PNG)",
       "event": [
         {
           "listen": "test",
@@ -341,10 +502,22 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/{{code}}/qr",
-          "host": ["{{baseUrl}}"],
-          "path": ["{{code}}", "qr"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "{{code}}",
+            "qr"
+          ],
+          "query": [
+            {
+              "key": "format",
+              "value": "svg",
+              "description": "svg | png"
+            }
+          ]
         },
-        "description": "Public, cacheable SVG QR code pointing at the short URL."
+        "description": "QR code for the short URL. `format=svg` (default) or `format=png`."
       }
     },
     {
@@ -362,11 +535,22 @@
       ],
       "request": {
         "method": "DELETE",
-        "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
         "url": {
           "raw": "{{baseUrl}}/api/links/{{code}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "links", "{{code}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "links",
+            "{{code}}"
+          ]
         },
         "description": "Deletes the link and its click rows; the cached redirect mapping is invalidated."
       }
@@ -391,8 +575,12 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/health",
-          "host": ["{{baseUrl}}"],
-          "path": ["health"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
         }
       }
     },
@@ -411,15 +599,25 @@
       ],
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{ \"url\": \"https://example.com\" }"
         },
         "url": {
           "raw": "{{baseUrl}}/api/shorten",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "shorten"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "shorten"
+          ]
         }
       }
     },
@@ -439,8 +637,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "X-API-Key", "value": "{{apiKey}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -448,8 +652,13 @@
         },
         "url": {
           "raw": "{{baseUrl}}/api/shorten",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "shorten"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "shorten"
+          ]
         }
       }
     }

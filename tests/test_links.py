@@ -18,8 +18,9 @@ async def test_list_links_returns_own_only(client):
     mine = (await client.get("/api/links", headers=AUTH_HEADERS)).json()
     theirs = (await client.get("/api/links", headers={"X-API-Key": SECOND_API_KEY})).json()
 
-    assert len(mine) == 1 and mine[0]["original_url"] == "https://mine.example/1"
-    assert len(theirs) == 1 and theirs[0]["original_url"] == "https://theirs.example/1"
+    assert mine["total"] == 1 and theirs["total"] == 1
+    assert mine["items"][0]["original_url"] == "https://mine.example/1"
+    assert theirs["items"][0]["original_url"] == "https://theirs.example/1"
 
 
 async def test_list_links_includes_click_counts(client):
@@ -27,8 +28,8 @@ async def test_list_links_includes_click_counts(client):
     for _ in range(2):
         await client.get(f"/{data['code']}")
     links = (await client.get("/api/links", headers=AUTH_HEADERS)).json()
-    assert links[0]["total_clicks"] == 2
-    assert links[0]["short_url"].endswith(links[0]["code"])
+    assert links["items"][0]["total_clicks"] == 2
+    assert links["items"][0]["short_url"].endswith(links["items"][0]["code"])
 
 
 async def test_list_links_requires_auth(client):
@@ -45,7 +46,7 @@ async def test_delete_link_then_allEndpoints_404(client):
     assert (await client.get(f"/{code}")).status_code == 404
     assert (await client.get(f"/api/stats/{code}", headers=AUTH_HEADERS)).status_code == 404
     links = (await client.get("/api/links", headers=AUTH_HEADERS)).json()
-    assert links == []
+    assert links["items"] == [] and links["total"] == 0
 
 
 async def test_delete_cascades_click_rows(client, db_engine):

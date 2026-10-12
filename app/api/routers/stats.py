@@ -114,13 +114,14 @@ async def export_clicks_csv(
 
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\n")
-    writer.writerow(["clicked_at", "ip_hash", "user_agent"])
+    writer.writerow(["clicked_at", "ip_hash", "user_agent", "referrer"])
     for click in clicks:
         writer.writerow(
             [
                 click.clicked_at.isoformat() if click.clicked_at else "",
                 (click.ip_hash or "")[:12],  # truncated for privacy, as in detail view
                 click.user_agent or "",
+                click.referrer or "direct",
             ]
         )
     return Response(

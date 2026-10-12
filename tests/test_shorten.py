@@ -94,7 +94,7 @@ async def test_shorten_duplicate_url_returns_existing_link(client):
     second = await shorten(client, url="https://example.com/dup")
     assert first["code"] == second["code"]
     links = (await client.get("/api/links", headers=AUTH_HEADERS)).json()
-    assert len(links) == 1
+    assert len(links["items"]) == 1
 
 
 async def test_shorten_accepts_unicode_url(client):

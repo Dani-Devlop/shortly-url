@@ -141,7 +141,7 @@ async def test_expired_link_still_manageable_and_listed(client):
     await asyncio.sleep(1.4)
 
     links = await client.get("/api/links", headers=AUTH_HEADERS)
-    assert any(item["code"] == code for item in links.json())
+    assert any(item["code"] == code for item in links.json()["items"])
 
     detail = await client.get(f"/api/links/{code}", headers=AUTH_HEADERS)
     assert detail.status_code == 200

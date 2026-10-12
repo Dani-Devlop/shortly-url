@@ -1,13 +1,14 @@
 """Public redirect endpoint — the hot path (Redis cache + background click tracking)
-plus the QR-code view for a short link.
+plus the QR-code view for a short link (SVG or PNG).
 """
 
 import io
 import re
 
 import qrcode
+import qrcode.image.pil  # noqa: F401 — registers the PIL image factory
 import qrcode.image.svg
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import RedirectResponse, Response
 
 from app.core.config import get_settings
@@ -56,13 +57,20 @@ async def redirect_by_code(
             code=code,
             ip=_client_ip(request),
             user_agent=request.headers.get("user-agent"),
+            referrer=request.headers.get("referer"),
         ),
     )
 
 
 @router.get("/{code}/qr", include_in_schema=False)
-async def qr_code(code: str) -> Response:
-    """SVG QR code pointing at the short URL (public, cacheable)."""
+async def qr_code(
+    code: str,
+    format: str = Query(default="svg", pattern="^(svg|png)$"),
+) -> Response:
+    """QR code pointing at the short URL (public, cacheable).
+
+    ``format=svg`` (default) returns vector SVG; ``format=png`` a raster image.
+    """
     if not CODE_PATTERN.match(code):
         raise NotFoundError(f"Short code '{code}' does not exist")
 
@@ -74,10 +82,15 @@ async def qr_code(code: str) -> Response:
     qr.add_data(short_url)
     qr.make(fit=True)
     buffer = io.BytesIO()
-    qr.make_image(image_factory=qrcode.image.svg.SvgPathImage).save(buffer)
+    if format == "png":
+        qr.make_image(image_factory=qrcode.image.pil.PilImage).save(buffer, format="PNG")
+        media_type = "image/png"
+    else:
+        qr.make_image(image_factory=qrcode.image.svg.SvgPathImage).save(buffer)
+        media_type = "image/svg+xml"
 
     return Response(
         content=buffer.getvalue(),
-        media_type="image/svg+xml",
+        media_type=media_type,
         headers={"Cache-Control": "public, max-age=86400"},
     )

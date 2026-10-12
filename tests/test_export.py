@@ -62,11 +62,12 @@ async def test_clicks_export_csv_shape(client):
     assert f"{code}-clicks.csv" in response.headers.get("content-disposition", "")
 
     rows = _parse_csv(response.text)
-    assert rows[0] == ["clicked_at", "ip_hash", "user_agent"]
+    assert rows[0] == ["clicked_at", "ip_hash", "user_agent", "referrer"]
     assert len(rows) == 3  # header + 2 clicks
     for row in rows[1:]:
         assert len(row[1]) <= 12  # ip_hash is truncated for privacy
     assert any(row[2] == "pytest-agent/1.0" for row in rows[1:])
+    assert any(row[3] == "direct" for row in rows[1:])  # no Referer header sent
 
 
 async def test_clicks_export_unknown_code_404(client):

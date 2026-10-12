@@ -6,7 +6,7 @@ import io
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Query, Response, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -22,8 +22,10 @@ from app.schemas.link import (
     BulkShortenRequest,
     LinkDetailOut,
     LinkOut,
+    LinkPageOut,
     LinkUpdate,
     RecentClickOut,
+    ReferrerStat,
     ShortenRequest,
 )
 from app.services.link_service import (
@@ -36,6 +38,7 @@ from app.services.link_service import (
 from app.services.stats_service import (
     click_counts_for_links,
     get_recent_clicks,
+    get_top_referrers,
     get_total_clicks,
 )
 
@@ -180,23 +183,40 @@ async def export_links_csv(
     )
 
 
-@router.get("/links", response_model=list[LinkOut])
+@router.get("/links", response_model=LinkPageOut)
 async def list_links(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    limit: int = Query(default=50, ge=1, le=200),
-) -> list[LinkOut]:
-    """List the authenticated user's links, newest first, with click counts."""
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> LinkPageOut:
+    """Paginated list of the authenticated user's links, newest first.
+
+    Returns ``{items, total, limit, offset}`` — ``total`` counts all the
+    user's links so clients can compute page counts.
+    """
+    total = int(
+        await db.scalar(
+            select(func.count()).select_from(Link).where(Link.owner_id == user.id)
+        )
+        or 0
+    )
     rows = (
         await db.execute(
             select(Link)
             .where(Link.owner_id == user.id)
             .order_by(Link.created_at.desc(), Link.id.desc())
+            .offset(offset)
             .limit(limit)
         )
     ).scalars().all()
     counts = await click_counts_for_links(db, [link.id for link in rows])
-    return [_to_out(link, counts.get(link.id, 0)) for link in rows]
+    return LinkPageOut(
+        items=[_to_out(link, counts.get(link.id, 0)) for link in rows],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 async def _owned_link(db: AsyncSession, code: str, user: User) -> Link:
@@ -213,15 +233,21 @@ async def link_detail(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> LinkDetailOut:
-    """Full detail for one of the user's links, including the 20 most recent clicks."""
+    """Full detail for one of the user's links: the 20 most recent clicks and
+    the all-time top traffic sources."""
     link = await _owned_link(db, code, user)
     recent = [
         RecentClickOut(
             clicked_at=click.clicked_at,
             ip_hash=click.ip_hash[:12] if click.ip_hash else None,
             user_agent=click.user_agent,
+            referrer=click.referrer,
         )
         for click in await get_recent_clicks(db, link, limit=20)
+    ]
+    referrers = [
+        ReferrerStat(source=source or "direct", clicks=clicks)
+        for source, clicks in await get_top_referrers(db, link, limit=5)
     ]
     return LinkDetailOut(
         id=link.id,
@@ -232,6 +258,7 @@ async def link_detail(
         expires_at=link.expires_at,
         total_clicks=await get_total_clicks(db, link),
         recent_clicks=recent,
+        top_referrers=referrers,
     )
 
 

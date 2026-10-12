@@ -46,7 +46,8 @@ class Settings(BaseSettings):
     @property
     def sync_database_url(self) -> str:
         """DSN normalised for sync tooling (Alembic)."""
-        return self.async_database_url.replace("+asyncpg", "+psycopg2")
+        url = self.async_database_url.replace("+asyncpg", "+psycopg2")
+        return url.replace("+aiosqlite", "")  # pysqlite is the sync sqlite driver
 
     @staticmethod
     def _normalize_postgres_scheme(url: str) -> str:

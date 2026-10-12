@@ -83,6 +83,24 @@ async def get_recent_clicks(
     return list(rows.scalars().all())
 
 
+async def get_top_referrers(
+    db: AsyncSession, link: Link, limit: int = 5
+) -> list[tuple[str | None, int]]:
+    """Traffic sources ranked by clicks, newest-window agnostic (all-time).
+
+    Returns ``(referrer_or_None, clicks)`` — ``None`` means direct traffic.
+    Ties break alphabetically for deterministic output.
+    """
+    rows = await db.execute(
+        select(Click.referrer, func.count().label("clicks"))
+        .where(Click.link_id == link.id)
+        .group_by(Click.referrer)
+        .order_by(func.count().desc(), Click.referrer.asc())
+        .limit(limit)
+    )
+    return [(row.referrer, int(row.clicks)) for row in rows.all()]
+
+
 async def get_daily_clicks_for_links(
     db: AsyncSession, link_ids: list[int], days: int = 7
 ) -> dict[int, list[int]]:
