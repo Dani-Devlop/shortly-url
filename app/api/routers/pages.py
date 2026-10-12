@@ -15,7 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import __version__
 from app.db.session import get_db
 from app.models import Click, Link
-from app.services.stats_service import get_daily_clicks_for_links
+from app.services.stats_service import (
+    get_daily_clicks_for_links,
+    get_device_breakdown_global,
+)
 
 router = APIRouter(tags=["pages"])
 
@@ -24,6 +27,8 @@ _templates = Jinja2Templates(
 )
 
 SPARKLINE_DAYS = 7
+DEVICE_PANEL_DAYS = 7
+DEVICE_CLASSES = ("desktop", "mobile", "tablet", "bot", "other")
 PER_PAGE_CHOICES = (10, 25, 50)
 TOP_LINKS_POOL = 200  # window scanned for the "Top links" panel
 
@@ -113,6 +118,24 @@ def _truncate(url: str, limit: int = 64) -> str:
     return url if len(url) <= limit else url[: limit - 1] + "…"
 
 
+def _device_panel(
+    items: list[tuple[str, int]], total: int
+) -> list[dict]:
+    """Render data for the devices panel: counts + share of the window."""
+    if total <= 0:
+        return []
+
+    def rank(item: tuple[str, int]) -> tuple[int, int]:
+        known = DEVICE_CLASSES.index(item[0]) if item[0] in DEVICE_CLASSES else len(DEVICE_CLASSES)
+        return (-item[1], known)
+
+    ranked = sorted(items, key=rank)
+    return [
+        {"device": device, "clicks": clicks, "pct": round(clicks * 100 / total)}
+        for device, clicks in ranked
+    ]
+
+
 async def _links_with_counts(
     db: AsyncSession,
     base_url: str,
@@ -185,6 +208,9 @@ async def dashboard(
         "selected": None,
         "error": None,
         "spark_days": SPARKLINE_DAYS,
+        "device_days": DEVICE_PANEL_DAYS,
+        "devices": [],
+        "devices_total": 0,
     }
     try:
         total_links = int(
@@ -229,6 +255,12 @@ async def dashboard(
         context["top_links"] = sorted(
             top_pool, key=lambda item: item["clicks"], reverse=True
         )[:5]
+
+        dev_items, dev_total = await get_device_breakdown_global(
+            db, days=DEVICE_PANEL_DAYS
+        )
+        context["devices"] = _device_panel(dev_items, dev_total)
+        context["devices_total"] = dev_total
 
         if code:
             link = await db.scalar(select(Link).where(Link.code == code))

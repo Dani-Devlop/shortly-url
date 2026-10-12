@@ -84,21 +84,77 @@ async def get_recent_clicks(
 
 
 async def get_top_referrers(
-    db: AsyncSession, link: Link, limit: int = 5
+    db: AsyncSession, link: Link, limit: int = 5, days: int | None = None
 ) -> list[tuple[str | None, int]]:
-    """Traffic sources ranked by clicks, newest-window agnostic (all-time).
+    """Traffic sources ranked by clicks.
 
-    Returns ``(referrer_or_None, clicks)`` — ``None`` means direct traffic.
-    Ties break alphabetically for deterministic output.
+    ``days=None`` aggregates all-time; an integer restricts the window to the
+    last N days (rolling). Returns ``(referrer_or_None, clicks)`` — ``None``
+    means direct traffic. Ties break alphabetically for deterministic output.
     """
+    stmt = select(Click.referrer, func.count().label("clicks")).where(
+        Click.link_id == link.id
+    )
+    if days is not None:
+        stmt = stmt.where(Click.clicked_at >= datetime.now(UTC) - timedelta(days=days))
     rows = await db.execute(
-        select(Click.referrer, func.count().label("clicks"))
-        .where(Click.link_id == link.id)
-        .group_by(Click.referrer)
+        stmt.group_by(Click.referrer)
         .order_by(func.count().desc(), Click.referrer.asc())
         .limit(limit)
     )
     return [(row.referrer, int(row.clicks)) for row in rows.all()]
+
+
+async def get_referrer_stats(
+    db: AsyncSession, link: Link, days: int, limit: int
+) -> tuple[list[tuple[str | None, int]], int]:
+    """Windowed referrer breakdown for one link plus the window's click total."""
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+    total = int(
+        await db.scalar(
+            select(func.count())
+            .select_from(Click)
+            .where(Click.link_id == link.id, Click.clicked_at >= cutoff)
+        )
+        or 0
+    )
+    items = await get_top_referrers(db, link, limit=limit, days=days)
+    return items, total
+
+
+async def get_device_breakdown(db: AsyncSession, link: Link) -> list[tuple[str, int]]:
+    """All-time device mix for one link, ranked by clicks (deterministic ties)."""
+    rows = await db.execute(
+        select(Click.device, func.count().label("clicks"))
+        .where(Click.link_id == link.id)
+        .group_by(Click.device)
+        .order_by(func.count().desc(), Click.device.asc())
+    )
+    return [(str(row.device), int(row.clicks)) for row in rows.all()]
+
+
+async def get_device_breakdown_global(
+    db: AsyncSession, days: int = 7, link_ids: list[int] | None = None
+) -> tuple[list[tuple[str, int]], int]:
+    """Device mix over a rolling window, optionally scoped to specific links.
+
+    Returns ``(items, total)`` where items cover every class present in the
+    window (``other`` included), ranked by clicks. A zero-click window yields
+    ``([], 0)`` so the dashboard can show an empty state.
+    """
+    stmt = select(Click.device, func.count().label("clicks"))
+    if link_ids is not None:
+        if not link_ids:
+            return [], 0
+        stmt = stmt.where(Click.link_id.in_(link_ids))
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+    rows = await db.execute(
+        stmt.where(Click.clicked_at >= cutoff)
+        .group_by(Click.device)
+        .order_by(func.count().desc(), Click.device.asc())
+    )
+    items = [(str(row.device), int(row.clicks)) for row in rows.all()]
+    return items, sum(count for _, count in items)
 
 
 async def get_daily_clicks_for_links(

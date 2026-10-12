@@ -129,3 +129,36 @@ async def test_dashboard_per_page_invalid_falls_back(client):
     response = await client.get("/", params={"per_page": 37})
     assert response.status_code == 200
     assert 'value="25" selected' in response.text  # clamped to a valid choice
+
+
+async def test_dashboard_devices_panel(client):
+    """Devices panel renders the stacked bar + legend from real click data."""
+    data = await shorten(client, url="https://example.com/dev-panel")
+    desktop_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0 Safari/537.36"
+    mobile_ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) Mobile/15E148 Safari/604.1"
+    await client.get(f"/{data['code']}", headers={"User-Agent": desktop_ua})
+    await client.get(f"/{data['code']}", headers={"User-Agent": desktop_ua})
+    await client.get(f"/{data['code']}", headers={"User-Agent": mobile_ua})
+
+    response = await client.get("/")
+    assert response.status_code == 200
+    assert "Devices" in response.text
+    assert "dev-bar" in response.text
+    assert 'dev-seg dev-desktop' in response.text
+    assert 'dev-seg dev-mobile' in response.text
+    # desktop has 2/3 of the clicks → width 67%
+    assert 'style="width: 67%"' in response.text
+
+
+async def test_dashboard_devices_panel_empty_state(client):
+    response = await client.get("/")
+    assert response.status_code == 200
+    assert "No clicks in the last" in response.text
+
+
+async def test_dashboard_auto_refresh_toggle_present(client):
+    response = await client.get("/")
+    assert response.status_code == 200
+    assert 'id="autorefBtn"' in response.text
+    assert "shortlyAutoRefresh" in response.text  # persistence wiring
+    assert "dialog[open]" in response.text  # pause guard while modals are open

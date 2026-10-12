@@ -23,6 +23,11 @@ class Click(Base):
     user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
     # Page that sent the visitor (Referer header), truncated — None = direct.
     referrer: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # Coarse device class derived from the user agent at click time:
+    # desktop | mobile | tablet | bot | other.
+    device: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="other", server_default="other", index=True
+    )
 
     link = relationship("Link", back_populates="clicks")
 

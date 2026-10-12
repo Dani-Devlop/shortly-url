@@ -63,7 +63,7 @@
             "shorten"
           ]
         },
-        "description": "Create a short link. Duplicate URLs from the same owner return the existing link. Optional `custom_code` must be 4–16 chars (letters/digits/-/_)."
+        "description": "Create a short link. Duplicate URLs from the same owner return the existing link. Optional `custom_code` must be 4–16 chars (letters/digits/-/_). With Redis enabled the response carries X-RateLimit-Limit / X-RateLimit-Remaining / X-RateLimit-Reset headers; exceeding the budget answers 429 with Retry-After."
       }
     },
     {
@@ -270,6 +270,96 @@
           ]
         }
       }
+    },
+    {
+      "name": "Stats — Device Mix (windowed)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/stats/devices?days=7",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "stats",
+            "devices?days=7"
+          ],
+          "query": []
+        },
+        "description": "Device mix (desktop/mobile/tablet/bot/other) across the caller's links over a rolling 1–90 day window. Returns {window_days, total, items:[{device, clicks}]}."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('envelope has window_days/total/items', () => {",
+              "    pm.expect(body).to.have.property('window_days');",
+              "    pm.expect(body).to.have.property('total');",
+              "    pm.expect(body.items).to.be.an('array');",
+              "});",
+              "pm.test('device classes are known', () => {",
+              "    const known = ['desktop','mobile','tablet','bot','other'];",
+              "    body.items.forEach((i) => pm.expect(known).to.include(i.device));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stats — Windowed Referrers",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/stats/{{code}}/referrers?days=7&limit=10",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "stats",
+            "{{code}}",
+            "referrers?days=7&limit=10"
+          ],
+          "query": []
+        },
+        "description": "Top traffic sources for one link within a rolling window. 'total' counts every click in the window (even beyond 'limit'); 'direct' = no referer header."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('envelope has code/window_days/total/items', () => {",
+              "    pm.expect(body).to.have.property('code');",
+              "    pm.expect(body).to.have.property('window_days');",
+              "    pm.expect(body).to.have.property('total');",
+              "    pm.expect(body.items).to.be.an('array');",
+              "});"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Export — Clicks CSV",

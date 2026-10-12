@@ -60,6 +60,15 @@ class RateLimitError(AppError):
     status_code = 429
     code = "rate_limited"
 
-    def __init__(self, message: str = "Too many requests", *, retry_after: int = 60) -> None:
+    def __init__(
+        self,
+        message: str = "Too many requests",
+        *,
+        retry_after: int = 60,
+        budget: object | None = None,
+    ) -> None:
         super().__init__(message)
         self.retry_after = max(1, retry_after)
+        # Optional RateLimitBudget — the exception handler turns it into
+        # X-RateLimit-* headers on the 429 response.
+        self.budget = budget

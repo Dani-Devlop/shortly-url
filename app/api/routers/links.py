@@ -20,6 +20,7 @@ from app.schemas.link import (
     BulkResultItem,
     BulkShortenOut,
     BulkShortenRequest,
+    DeviceStat,
     LinkDetailOut,
     LinkOut,
     LinkPageOut,
@@ -37,6 +38,7 @@ from app.services.link_service import (
 )
 from app.services.stats_service import (
     click_counts_for_links,
+    get_device_breakdown,
     get_recent_clicks,
     get_top_referrers,
     get_total_clicks,
@@ -70,7 +72,9 @@ async def shorten(
 ) -> LinkOut:
     """Create a short link. Re-submitting the same URL returns the existing link."""
     # Redis fixed-window limit per API key (fails open without Redis).
-    await enforce_rate_limit(f"shorten:{hash_identifier(user.api_key)}")
+    budget = await enforce_rate_limit(f"shorten:{hash_identifier(user.api_key)}")
+    if budget:
+        response.headers.update(budget.headers())
     link = await create_link(
         db,
         original_url=str(payload.url),
@@ -97,7 +101,7 @@ async def shorten_bulk(
     errors are reported per-item instead of failing the whole request."""
     await enforce_rate_limit(
         f"shorten:{hash_identifier(user.api_key)}", cost=len(payload.urls)
-    )
+    )  # bulk consumes its full cost up-front; no useful remaining value to advertise
     results: list[BulkResultItem] = []
     for item in payload.urls:
         raw_url = str(item)
@@ -234,7 +238,7 @@ async def link_detail(
     db: AsyncSession = Depends(get_db),
 ) -> LinkDetailOut:
     """Full detail for one of the user's links: the 20 most recent clicks and
-    the all-time top traffic sources."""
+    the all-time top traffic sources and device mix."""
     link = await _owned_link(db, code, user)
     recent = [
         RecentClickOut(
@@ -242,12 +246,17 @@ async def link_detail(
             ip_hash=click.ip_hash[:12] if click.ip_hash else None,
             user_agent=click.user_agent,
             referrer=click.referrer,
+            device=click.device or "other",
         )
         for click in await get_recent_clicks(db, link, limit=20)
     ]
     referrers = [
         ReferrerStat(source=source or "direct", clicks=clicks)
         for source, clicks in await get_top_referrers(db, link, limit=5)
+    ]
+    devices = [
+        DeviceStat(device=device, clicks=clicks)
+        for device, clicks in await get_device_breakdown(db, link)
     ]
     return LinkDetailOut(
         id=link.id,
@@ -259,6 +268,7 @@ async def link_detail(
         total_clicks=await get_total_clicks(db, link),
         recent_clicks=recent,
         top_referrers=referrers,
+        device_breakdown=devices,
     )
 
 

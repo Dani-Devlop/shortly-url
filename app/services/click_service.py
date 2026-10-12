@@ -10,6 +10,7 @@ from starlette.background import BackgroundTask
 
 from app.core.redis import incr_counter
 from app.core.security import hash_ip
+from app.core.user_agent import classify_user_agent
 from app.db.session import get_session_factory
 from app.models import Click
 
@@ -31,6 +32,7 @@ async def record_click(
                     ip_hash=hash_ip(ip),
                     user_agent=user_agent[:512] if user_agent else None,
                     referrer=referrer[:512] if referrer else None,
+                    device=classify_user_agent(user_agent),
                 )
             )
             await session.commit()

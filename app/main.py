@@ -59,6 +59,9 @@ def create_app() -> FastAPI:
         retry_after = getattr(exc, "retry_after", None)
         if retry_after:
             headers["Retry-After"] = str(retry_after)
+        budget = getattr(exc, "budget", None)
+        if budget is not None:
+            headers.update(budget.headers())
         return JSONResponse(
             status_code=exc.status_code,
             content=_error_body(exc.code, exc.message),

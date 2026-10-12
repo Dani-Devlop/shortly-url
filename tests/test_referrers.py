@@ -96,6 +96,6 @@ async def test_clicks_csv_includes_referrer_column(client):
     response = await client.get(f"/api/stats/{code}/export", headers=AUTH_HEADERS)
     assert response.status_code == 200
     lines = response.text.strip().splitlines()
-    assert lines[0] == "clicked_at,ip_hash,user_agent,referrer"
+    assert lines[0] == "clicked_at,ip_hash,user_agent,referrer,device"
     assert any("https://csv.example/from" in line for line in lines[1:])
     assert any(",direct" in line for line in lines[1:])

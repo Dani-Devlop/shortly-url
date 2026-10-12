@@ -1,5 +1,5 @@
 """Click analytics endpoints (owner-only): totals, daily series, sparklines,
-per-link CSV export."""
+global device mix, windowed referrers, per-link CSV export."""
 
 import csv
 import io
@@ -12,12 +12,24 @@ from app.api.deps import get_current_user
 from app.core.exceptions import NotFoundError
 from app.db.session import get_db
 from app.models import Link, User
-from app.schemas.link import DailyStatPoint, DailyStats, SparklineItem, SparklinesOut, StatsOut
+from app.schemas.link import (
+    DailyStatPoint,
+    DailyStats,
+    DeviceBreakdownOut,
+    DeviceStat,
+    ReferrerStat,
+    ReferrerWindowOut,
+    SparklineItem,
+    SparklinesOut,
+    StatsOut,
+)
 from app.services.link_service import get_link_by_code
 from app.services.stats_service import (
     get_daily_clicks,
     get_daily_clicks_for_links,
+    get_device_breakdown_global,
     get_recent_clicks,
+    get_referrer_stats,
     get_total_clicks,
 )
 
@@ -65,6 +77,29 @@ async def sparklines(
     return SparklinesOut(window_days=days, items=items)
 
 
+@router.get("/devices", response_model=DeviceBreakdownOut)
+async def devices(
+    days: int = Query(default=7, ge=1, le=90),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> DeviceBreakdownOut:
+    """Device mix (desktop/mobile/tablet/bot/other) across the caller's links.
+
+    NOTE: registered before ``/{code}`` so "devices" is never read as a code.
+    """
+    link_ids = list(
+        (
+            await db.execute(select(Link.id).where(Link.owner_id == user.id))
+        ).scalars().all()
+    )
+    items, total = await get_device_breakdown_global(db, days=days, link_ids=link_ids)
+    return DeviceBreakdownOut(
+        window_days=days,
+        total=total,
+        items=[DeviceStat(device=device, clicks=clicks) for device, clicks in items],
+    )
+
+
 @router.get("/{code}", response_model=StatsOut)
 async def link_stats(
     code: str,
@@ -102,6 +137,29 @@ async def link_daily_stats(
     )
 
 
+@router.get("/{code}/referrers", response_model=ReferrerWindowOut)
+async def link_referrer_window(
+    code: str,
+    days: int = Query(default=7, ge=1, le=90),
+    limit: int = Query(default=10, ge=1, le=50),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ReferrerWindowOut:
+    """Top traffic sources for one link within a rolling window (1–90 days).
+
+    ``items`` are ranked sources (``direct`` when the referer was absent);
+    ``total`` counts every click in the window, including beyond ``limit``.
+    """
+    link = await _owned_link(db, code, user)
+    rows, total = await get_referrer_stats(db, link, days=days, limit=limit)
+    return ReferrerWindowOut(
+        code=link.code,
+        window_days=days,
+        total=total,
+        items=[ReferrerStat(source=source or "direct", clicks=clicks) for source, clicks in rows],
+    )
+
+
 @router.get("/{code}/export", response_class=Response, include_in_schema=False)
 async def export_clicks_csv(
     code: str,
@@ -114,7 +172,7 @@ async def export_clicks_csv(
 
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\n")
-    writer.writerow(["clicked_at", "ip_hash", "user_agent", "referrer"])
+    writer.writerow(["clicked_at", "ip_hash", "user_agent", "referrer", "device"])
     for click in clicks:
         writer.writerow(
             [
@@ -122,6 +180,7 @@ async def export_clicks_csv(
                 (click.ip_hash or "")[:12],  # truncated for privacy, as in detail view
                 click.user_agent or "",
                 click.referrer or "direct",
+                click.device or "other",
             ]
         )
     return Response(

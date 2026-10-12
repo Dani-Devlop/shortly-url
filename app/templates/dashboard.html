@@ -269,6 +269,67 @@
     .ref-title { font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: .2rem; }
     .click-log .ref { color: var(--accent); opacity: .85; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+    /* ---- devices panel ---- */
+    .dev-bar {
+      display: flex; height: 12px; border-radius: 8px; overflow: hidden;
+      background: var(--border); margin: .35rem 0 .7rem; box-shadow: inset 0 0 0 1px var(--border);
+    }
+    .dev-seg { height: 100%; min-width: 0; transition: width .5s cubic-bezier(.22,1,.36,1); position: relative; }
+    .dev-seg + .dev-seg { box-shadow: -1px 0 0 rgba(0,0,0,.25); }
+    .dev-seg:first-child { border-radius: 8px 0 0 8px; }
+    .dev-seg:last-child { border-radius: 0 8px 8px 0; }
+    .dev-seg:only-child { border-radius: 8px; }
+    .dev-desktop { background: linear-gradient(90deg, var(--accent-strong), var(--accent)); }
+    .dev-mobile  { background: linear-gradient(90deg, #d97706, var(--amber)); }
+    .dev-tablet  { background: linear-gradient(90deg, #7c3aed, #a78bfa); }
+    .dev-bot     { background: linear-gradient(90deg, #e11d48, #fb7185); }
+    .dev-other   { background: linear-gradient(90deg, #475569, #94a3b8); }
+    .dev-legend { list-style: none; display: flex; flex-direction: column; }
+    .dev-legend li {
+      display: flex; align-items: center; gap: .55rem; padding: .42rem 0;
+      border-bottom: 1px dashed var(--border); font-size: .8rem;
+    }
+    .dev-legend li:last-child { border-bottom: 0; }
+    .dev-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+    .dev-name { color: var(--text); font-weight: 600; text-transform: capitalize; }
+    .dev-legend .pct { color: var(--muted); font-size: .72rem; margin-left: auto; font-variant-numeric: tabular-nums; }
+    .dev-legend .count { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    /* ---- device chips (insights click log) ---- */
+    .dev-chip {
+      display: inline-flex; align-items: center; gap: .3rem; font-size: .64rem; font-weight: 700;
+      border-radius: 999px; padding: .1rem .5rem; letter-spacing: .03em;
+      background: rgba(148, 163, 184, .14); color: var(--muted); text-transform: capitalize;
+    }
+    .dev-chip.desktop { background: var(--accent-soft); color: var(--accent); }
+    .dev-chip.mobile  { background: var(--amber-soft); color: var(--amber); }
+    .dev-chip.tablet  { background: rgba(124, 58, 237, .16); color: #a78bfa; }
+    .dev-chip.bot     { background: var(--danger-soft); color: var(--danger); }
+    .click-log li { align-items: center; }
+    .click-log .dev-chip { flex-shrink: 0; }
+
+    /* ---- auto-refresh toggle ---- */
+    .autoref {
+      display: inline-flex; align-items: center; gap: .45rem; min-height: 38px;
+      padding: .3rem .8rem; border-radius: 999px; border: 1px solid var(--border-strong);
+      background: transparent; color: var(--muted); font-size: .78rem; font-weight: 600;
+      cursor: pointer; transition: all .15s ease; user-select: none;
+    }
+    .autoref:hover { border-color: var(--accent); color: var(--accent); }
+    .autoref .dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: background .15s ease;
+    }
+    .autoref.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+    .autoref.on .dot { background: var(--accent); animation: pulse 1.6s ease-in-out infinite; }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 var(--accent-soft); transform: scale(1); }
+      50% { box-shadow: 0 0 0 4px var(--accent-soft); transform: scale(1.15); }
+    }
+    .autoref .count { font-variant-numeric: tabular-nums; opacity: .8; min-width: 1.4rem; text-align: left; }
+
+    /* ---- stacked right column (top links + devices) ---- */
+    .stack { display: flex; flex-direction: column; gap: 1rem; }
+
     /* ---- QR dialog ---- */
     .qr-holder {
       display: grid; place-items: center; padding: 1rem; border: 1px dashed var(--border-strong);
@@ -411,25 +472,52 @@
             <li><span class="method get">GET</span><code>/api/links?limit&offset</code><span class="desc">list (paginated)</span></li>
             <li><span class="method get">GET</span><code>/api/stats/{code}</code><span class="desc">total clicks</span></li>
             <li><span class="method get">GET</span><code>/api/stats/{code}/daily</code><span class="desc">per-day series</span></li>
+            <li><span class="method get">GET</span><code>/api/stats/{code}/referrers?days</code><span class="desc">sources in window</span></li>
+            <li><span class="method get">GET</span><code>/api/stats/devices?days</code><span class="desc">device mix</span></li>
             <li><span class="method get">GET</span><code>/{code}</code><span class="desc">redirect 302</span></li>
             <li><span class="method get">GET</span><code>/{code}/qr?format=svg|png</code><span class="desc">QR code</span></li>
             <li><span class="method del">DELETE</span><code>/api/links/{code}</code><span class="desc">remove link</span></li>
           </ul>
+          <p class="note" style="margin-top:.6rem">With Redis on, <code class="inline">POST /api/shorten</code> answers with <code class="inline">X-RateLimit-*</code> headers and <code class="inline">Retry-After</code> on 429.</p>
           <p class="note" style="margin-top:.6rem">Full schemas at <a href="/docs" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">/docs</a> · Postman collection in the repo.</p>
         </div>
       </div>
-      <div class="panel">
-        <h2>👑 Top links <span class="hint">by clicks</span></h2>
-        <ol class="top-list">
-          {% for l in top_links %}
-            <li>
-              <div><span class="rank">#{{ loop.index }}</span><a href="/?code={{ l.code }}">{{ l.code }}</a><span class="dest" title="{{ l.original_url }}">{{ l.original_url_display }}</span></div>
-              <span class="clicks-badge {{ 'zero' if l.clicks == 0 }}">{{ l.clicks }}</span>
-            </li>
+      <div class="stack">
+        <div class="panel">
+          <h2>👑 Top links <span class="hint">by clicks</span></h2>
+          <ol class="top-list">
+            {% for l in top_links %}
+              <li>
+                <div><span class="rank">#{{ loop.index }}</span><a href="/?code={{ l.code }}">{{ l.code }}</a><span class="dest" title="{{ l.original_url }}">{{ l.original_url_display }}</span></div>
+                <span class="clicks-badge {{ 'zero' if l.clicks == 0 }}">{{ l.clicks }}</span>
+              </li>
+            {% else %}
+              <li class="muted">No data yet.</li>
+            {% endfor %}
+          </ol>
+        </div>
+        <div class="panel">
+          <h2>📱 Devices <span class="hint">last {{ device_days }}d · {{ devices_total }} click{{ 's' if devices_total != 1 }}</span></h2>
+          {% if devices %}
+            <div class="dev-bar" role="img" aria-label="Device mix for the last {{ device_days }} days">
+              {% for d in devices %}
+                <span class="dev-seg dev-{{ d.device }}" style="width: {{ d.pct }}%" title="{{ d.device }}: {{ d.clicks }} ({{ d.pct }}%)"></span>
+              {% endfor %}
+            </div>
+            <ul class="dev-legend">
+              {% for d in devices %}
+                <li>
+                  <span class="dev-dot dev-{{ d.device }}"></span>
+                  <span class="dev-name">{{ d.device }}</span>
+                  <span class="pct">{{ d.pct }}%</span>
+                  <span class="count">{{ d.clicks }}</span>
+                </li>
+              {% endfor %}
+            </ul>
           {% else %}
-            <li class="muted">No data yet.</li>
-          {% endfor %}
-        </ol>
+            <p class="note">No clicks in the last {{ device_days }} days yet — share a link and watch this fill up.</p>
+          {% endif %}
+        </div>
       </div>
     </section>
 
@@ -486,6 +574,9 @@
         <h2 style="margin:0">🔗 Recent links <span class="hint">hover a row for actions</span></h2>
         <form method="get" action="/" style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap">
           <input type="hidden" name="code" value="{{ lookup }}">
+          <button type="button" id="autorefBtn" class="autoref" aria-pressed="false" title="Reload this panel every 30 seconds">
+            <span class="dot" aria-hidden="true"></span> Auto<span class="count" id="autorefCount"></span>
+          </button>
           <span class="filter-box">
             <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
             <input id="tableFilter" type="search" placeholder="Filter this page…" aria-label="Filter links on this page" autocomplete="off">
@@ -635,6 +726,10 @@
     <div>
       <div class="ref-title">Traffic sources · all time</div>
       <div class="ref-chips" id="detailRefs"><span class="note">Loading…</span></div>
+    </div>
+    <div>
+      <div class="ref-title">Devices · all time</div>
+      <div class="ref-chips" id="detailDevices"><span class="note">Loading…</span></div>
     </div>
     <div class="click-log" id="detailClicks"><div class="empty">Loading…</div></div>
     <div class="row">
@@ -889,6 +984,23 @@
         + '</div>';
     }).join('');
   }
+  function renderDevices(list) {
+    const box = $('#detailDevices');
+    if (!list || !list.length) {
+      box.innerHTML = '<span class="note">No device data yet.</span>';
+      return;
+    }
+    const total = list.reduce((acc, r) => acc + r.clicks, 0);
+    const max = Math.max.apply(null, list.map((r) => r.clicks).concat([1]));
+    box.innerHTML = list.map((r) =>
+      '<div class="ref-chip">'
+      + '<span class="ref-name"><span class="host">' + escapeHtml(r.device) + '</span></span>'
+      + '<span class="ref-count">' + r.clicks + ' · ' + Math.round((r.clicks / total) * 100) + '%</span>'
+      + '<span class="ref-bar-wrap"><span class="ref-bar" style="width:'
+      + Math.max(4, Math.round((r.clicks / max) * 100)) + '%"></span></span>'
+      + '</div>'
+    ).join('');
+  }
 
   /* ---- detail dialog ---- */
   let detailCode = '';
@@ -907,6 +1019,7 @@
       $('#detailMeta').innerHTML = '<strong>→</strong> ' + (data.original_url || '') + expiry
         + ' · <strong>' + data.total_clicks + '</strong> total clicks';
       renderReferrers(data.top_referrers);
+      renderDevices(data.device_breakdown);
       const log = $('#detailClicks');
       if (!data.recent_clicks || !data.recent_clicks.length) {
         log.innerHTML = '<div class="empty">No clicks recorded yet.</div>';
@@ -915,8 +1028,9 @@
           const t = new Date(c.clicked_at).toLocaleString();
           const ref = c.referrer
             ? '<span class="ref" title="' + escapeHtml(c.referrer) + '">' + escapeHtml(refHost(c.referrer)) + '</span>'
-            : '';
-          return '<li><span>' + t + '</span>' + ref + '<span class="ua" title="' + (c.user_agent || '') + '">'
+            : '<span class="ref muted">direct</span>';
+          const dev = c.device ? '<span class="dev-chip ' + escapeHtml(c.device) + '">' + escapeHtml(c.device) + '</span>' : '';
+          return '<li><span>' + t + '</span>' + dev + ref + '<span class="ua" title="' + (c.user_agent || '') + '">'
             + (c.ip_hash || '—') + '</span></li>';
         }).join('');
       }
@@ -954,6 +1068,35 @@
   });
   $('#newUrl') && $('#newUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') createLink(); });
   refreshAdminState();
+
+  /* ---- auto-refresh (30s; pauses while a dialog is open) ---- */
+  (function autoRefresh() {
+    const btn = $('#autorefBtn');
+    if (!btn) return;
+    const counter = $('#autorefCount');
+    const PERIOD = 30;
+    let tick = PERIOD;
+    let timer = null;
+    function setOn(on) {
+      btn.classList.toggle('on', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      localStorage.setItem('shortlyAutoRefresh', on ? '1' : '0');
+      if (on) { tick = PERIOD; timer = setInterval(step, 1000); }
+      else { clearInterval(timer); counter.textContent = ''; btn.title = 'Reload this panel every 30 seconds'; }
+    }
+    function step() {
+      // Never yank the page out from under an open dialog or focused input.
+      if (document.querySelector('dialog[open]')) { tick = PERIOD; counter.textContent = ''; return; }
+      if (tick <= 0) { location.reload(); return; }
+      counter.textContent = tick + 's';
+      btn.title = 'Refreshing in ' + tick + 's — click to turn off';
+      tick -= 1;
+    }
+    btn.addEventListener('click', () => setOn(!btn.classList.contains('on')));
+    // Reconstruct cleanly: toggle state from storage.
+    btn.classList.remove('on');
+    if (localStorage.getItem('shortlyAutoRefresh') === '1') setOn(true);
+  })();
 </script>
 </body>
 </html>

@@ -128,11 +128,37 @@ class RecentClickOut(BaseModel):
         default=None,
         description="Referer of the click; null means direct (no referrer).",
     )
+    device: str = Field(
+        default="other",
+        description="Coarse device class: desktop | mobile | tablet | bot | other.",
+    )
 
 
 class ReferrerStat(BaseModel):
     source: str = Field(description="Referrer URL, or 'direct' when the header was absent.")
     clicks: int
+
+
+class DeviceStat(BaseModel):
+    device: str = Field(description="desktop | mobile | tablet | bot | other")
+    clicks: int
+
+
+class DeviceBreakdownOut(BaseModel):
+    """Envelope for GET /api/stats/devices."""
+
+    window_days: int
+    total: int = Field(description="Clicks recorded in the window across all devices.")
+    items: list[DeviceStat]
+
+
+class ReferrerWindowOut(BaseModel):
+    """Envelope for GET /api/stats/{code}/referrers."""
+
+    code: str
+    window_days: int
+    total: int = Field(description="Clicks recorded in the window (all sources).")
+    items: list[ReferrerStat]
 
 
 class LinkDetailOut(LinkOut):
@@ -143,6 +169,10 @@ class LinkDetailOut(LinkOut):
     top_referrers: list[ReferrerStat] = Field(
         default_factory=list,
         description="Traffic sources ranked by clicks (max 5).",
+    )
+    device_breakdown: list[DeviceStat] = Field(
+        default_factory=list,
+        description="All-time device mix for this link, ranked by clicks.",
     )
 
 

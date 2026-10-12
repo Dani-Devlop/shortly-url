@@ -62,7 +62,7 @@ async def test_clicks_export_csv_shape(client):
     assert f"{code}-clicks.csv" in response.headers.get("content-disposition", "")
 
     rows = _parse_csv(response.text)
-    assert rows[0] == ["clicked_at", "ip_hash", "user_agent", "referrer"]
+    assert rows[0] == ["clicked_at", "ip_hash", "user_agent", "referrer", "device"]
     assert len(rows) == 3  # header + 2 clicks
     for row in rows[1:]:
         assert len(row[1]) <= 12  # ip_hash is truncated for privacy
