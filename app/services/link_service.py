@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.exceptions import AppError, ConflictError
+from app.core.redis import cache_delete, cache_set
 from app.core.security import generate_short_code
 from app.models import Link
 
@@ -82,11 +83,20 @@ async def create_link(
     db.add(link)
     await db.commit()
     await db.refresh(link)
+    # Best-effort cache warm so the very first redirect is already hot.
+    await cache_set(
+        f"shortly:short:{code}",
+        {"url": link.original_url, "id": link.id},
+        settings.cache_ttl_seconds,
+    )
     logger.info("created link code=%s owner_id=%s", code, owner_id)
     return link
 
 
 async def delete_link(db: AsyncSession, link: Link) -> None:
+    code = link.code
     await db.delete(link)
     await db.commit()
-    logger.info("deleted link code=%s", link.code)
+    # Invalidate the cached mapping so deleted codes 404 immediately.
+    await cache_delete(f"shortly:short:{code}")
+    logger.info("deleted link code=%s", code)

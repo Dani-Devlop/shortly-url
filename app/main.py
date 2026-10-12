@@ -11,6 +11,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.api.routers import health, links, redirects, stats
 from app.core.config import get_settings
 from app.core.exceptions import AppError
+from app.core.redis import close_redis, init_redis
 from app.db.bootstrap import ensure_master_user
 
 settings = get_settings()
@@ -24,9 +25,11 @@ logger = logging.getLogger("shortly")
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    await init_redis()
     await ensure_master_user()
     logger.info("%s started (env=%s)", settings.project_name, settings.environment)
     yield
+    await close_redis()
     logger.info("%s shutting down", settings.project_name)
 
 

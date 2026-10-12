@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.core.config import get_settings
 from app.core.exceptions import NotFoundError
+from app.core.rate_limit import enforce_rate_limit
+from app.core.security import hash_identifier
 from app.db.session import get_db
 from app.models import Link, User
 from app.schemas.link import LinkOut, ShortenRequest
@@ -35,6 +37,8 @@ async def shorten(
     db: AsyncSession = Depends(get_db),
 ) -> LinkOut:
     """Create a short link. Re-submitting the same URL returns the existing link."""
+    # Redis fixed-window limit per API key (fails open without Redis).
+    await enforce_rate_limit(f"shorten:{hash_identifier(user.api_key)}")
     link = await create_link(
         db,
         original_url=str(payload.url),

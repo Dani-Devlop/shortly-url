@@ -5,7 +5,11 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
+from app.core.redis import get_redis
 from app.models import Click, Link
+
+settings = get_settings()
 
 
 async def count_clicks(db: AsyncSession, link_id: int) -> int:
@@ -28,7 +32,27 @@ async def click_counts_for_links(db: AsyncSession, link_ids: list[int]) -> dict[
 
 
 async def get_total_clicks(db: AsyncSession, link: Link) -> int:
-    return await count_clicks(db, link.id)
+    """Live counter from Redis with a DB fallback + cache backfill.
+
+    SQL remains the source of truth: if the counter key is missing it is
+    rebuilt from the ``clicks`` table.
+    """
+    redis = get_redis()
+    if redis is None:
+        return await count_clicks(db, link.id)
+    key = f"shortly:clicks:{link.code}"
+    try:
+        raw = await redis.get(key)
+        if raw is not None:
+            return int(raw)
+    except Exception:  # noqa: BLE001
+        pass
+    total = await count_clicks(db, link.id)
+    try:
+        await redis.set(key, total, ex=settings.counter_ttl_seconds)
+    except Exception:  # noqa: BLE001
+        pass
+    return total
 
 
 async def get_daily_clicks(
