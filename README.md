@@ -49,6 +49,8 @@ The collection ships with variables `baseUrl` and `apiKey` and covers every endp
 | `POST` | `/api/shorten` | ✅ | Create a short link. Body: `{"url": "...", "custom_code": null}` |
 | `GET` | `/{code}` | — | `302` redirect to the original URL (click recorded in background, `X-Cache: HIT\|MISS`) |
 | `GET` | `/{code}/qr` | — | SVG QR code for the short URL (cacheable, public) |
+| `GET` | `/api/stats/{code}` | ✅ | Total clicks for a link |
+| `GET` | `/api/stats/{code}/daily?days=14` | ✅ | Daily aggregated clicks (1–90 day window) |
 | `GET` | `/api/links` | ✅ | List the authenticated user's links with click counts |
 | `GET` | `/api/links/{code}` | ✅ | Link detail incl. the 20 most recent clicks (hashed IP prefix, user agent) |
 | `PATCH` | `/api/links/{code}` | ✅ | Update the destination URL (invalidates the cache entry) |
