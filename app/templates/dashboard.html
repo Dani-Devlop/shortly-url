@@ -6,47 +6,99 @@
   <meta name="theme-color" content="#0f172a">
   <title>shortly-url · dashboard</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <script>
+    /* Apply saved theme before first paint (no flash). */
+    (function () {
+      var saved = localStorage.getItem('shortlyTheme');
+      if (saved === 'light' || saved === 'dark') {
+        document.documentElement.dataset.theme = saved;
+      } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        document.documentElement.dataset.theme = 'light';
+      }
+    })();
+  </script>
   <style>
     :root {
       --bg: #0f172a; --bg-soft: #131f38; --card: #1e293b; --card-hover: #24334d;
-      --accent: #34d399; --accent-soft: rgba(52, 211, 153, .12);
-      --amber: #fbbf24; --text: #e2e8f0; --muted: #94a3b8; --danger: #f87171;
+      --accent: #34d399; --accent-strong: #10b981; --accent-ink: #052e1a;
+      --accent-soft: rgba(52, 211, 153, .12);
+      --amber: #fbbf24; --amber-soft: rgba(251, 191, 36, .12);
+      --danger: #f87171; --danger-soft: rgba(248, 113, 113, .1);
+      --text: #e2e8f0; --muted: #94a3b8;
       --border: rgba(148, 163, 184, .15); --border-strong: rgba(148, 163, 184, .3);
-      --radius: 12px; --shadow: 0 8px 24px rgba(2, 6, 23, .45);
+      --input-bg: #0b1220;
+      --radius: 12px; --radius-sm: 8px;
+      --shadow: 0 8px 24px rgba(2, 6, 23, .45);
+      --header-glow: linear-gradient(180deg, rgba(52, 211, 153, .07), transparent);
+      --hero-glow: radial-gradient(1200px 500px at 50% -10%, #1b2a4a 0%, var(--bg) 55%);
+      --spark-line: var(--accent); --spark-area: rgba(52, 211, 153, .16);
+    }
+    [data-theme="light"] {
+      --bg: #f2f6fc; --bg-soft: #e8eef8; --card: #ffffff; --card-hover: #f0f6ff;
+      --accent: #0d9f6e; --accent-strong: #059669; --accent-ink: #ffffff;
+      --accent-soft: rgba(13, 159, 110, .1);
+      --amber: #b45309; --amber-soft: rgba(180, 83, 9, .1);
+      --danger: #dc2626; --danger-soft: rgba(220, 38, 38, .08);
+      --text: #0f172a; --muted: #5b6b83;
+      --border: rgba(15, 23, 42, .12); --border-strong: rgba(15, 23, 42, .24);
+      --input-bg: #ffffff;
+      --shadow: 0 8px 24px rgba(15, 23, 42, .1);
+      --header-glow: linear-gradient(180deg, rgba(13, 159, 110, .06), transparent);
+      --hero-glow: radial-gradient(1200px 500px at 50% -10%, #dce9fb 0%, var(--bg) 55%);
+      --spark-line: var(--accent-strong); --spark-area: rgba(13, 159, 110, .14);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body {
       font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      background: radial-gradient(1200px 500px at 50% -10%, #1b2a4a 0%, var(--bg) 55%) fixed, var(--bg);
+      background: var(--hero-glow) fixed, var(--bg);
       color: var(--text); min-height: 100vh; display: flex; flex-direction: column;
+      transition: background-color .25s ease, color .25s ease;
     }
     header {
       padding: 1.1rem 2rem; display: flex; justify-content: space-between;
       align-items: center; flex-wrap: wrap; gap: .5rem;
       border-bottom: 1px solid var(--border);
-      background: linear-gradient(180deg, rgba(52, 211, 153, .06), transparent);
+      background: var(--header-glow);
       position: sticky; top: 0; backdrop-filter: blur(8px); z-index: 10;
     }
     .logo { font-size: 1.3rem; font-weight: 700; letter-spacing: -.02em; display: flex; align-items: center; gap: .4rem; }
     .logo span { color: var(--accent); }
-    .tagline { color: var(--muted); font-size: .82rem; display: flex; align-items: center; gap: .5rem; }
+    .tagline { color: var(--muted); font-size: .82rem; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
     .pill {
       background: var(--accent-soft); color: var(--accent); font-weight: 600;
       border-radius: 999px; padding: .18rem .65rem; font-size: .75rem;
     }
-    main { flex: 1; width: 100%; max-width: 1060px; margin: 0 auto; padding: 1.75rem 1rem 2.5rem; }
+    .head-actions { display: flex; align-items: center; gap: .6rem; }
+    #themeToggle {
+      width: 38px; height: 38px; min-height: 0; padding: 0; border-radius: 10px;
+      background: transparent; border: 1px solid var(--border-strong); color: var(--muted);
+      display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+      transition: color .15s ease, border-color .15s ease, transform .15s ease;
+    }
+    #themeToggle:hover { color: var(--amber); border-color: var(--amber); transform: rotate(15deg); }
+    #themeToggle svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    [data-theme="light"] #iconSun { display: none; }
+    html:not([data-theme="light"]) #iconMoon { display: none; }
+    main { flex: 1; width: 100%; max-width: 1100px; margin: 0 auto; padding: 1.75rem 1rem 2.5rem; }
     section { margin-bottom: 1.5rem; }
     h2 { font-size: .95rem; font-weight: 700; margin-bottom: .75rem; display: flex; align-items: center; gap: .5rem; }
     h2 .hint { color: var(--muted); font-weight: 400; font-size: .78rem; }
 
-    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; }
     .card {
       background: linear-gradient(160deg, var(--card) 0%, var(--bg-soft) 100%);
       border: 1px solid var(--border); border-radius: var(--radius); padding: 1.1rem 1.25rem;
-      transition: transform .15s ease, border-color .15s ease;
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+      position: relative; overflow: hidden;
     }
-    .card:hover { transform: translateY(-2px); border-color: var(--border-strong); }
+    .card::after {
+      content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0; transition: opacity .2s ease;
+    }
+    .card:hover { transform: translateY(-3px); border-color: var(--border-strong); box-shadow: var(--shadow); }
+    .card:hover::after { opacity: .8; }
     .card .value { font-size: 1.9rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
     .card .value.amber { color: var(--amber); }
     .card .label { color: var(--muted); font-size: .8rem; margin-top: .2rem; }
@@ -59,31 +111,46 @@
     @media (max-width: 820px) { .grid-2 { grid-template-columns: 1fr; } }
 
     form.search { display: flex; gap: .5rem; flex-wrap: wrap; }
-    input, select {
+    input, select, textarea {
       padding: .65rem .9rem; border-radius: 10px; border: 1px solid var(--border-strong);
-      background: #0b1220; color: var(--text); font-size: .9rem; min-height: 44px;
+      background: var(--input-bg); color: var(--text); font-size: .9rem; min-height: 44px;
+      transition: border-color .15s ease, box-shadow .15s ease;
+      font-family: inherit;
     }
-    input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+    textarea { min-height: 96px; resize: vertical; width: 100%; }
+    input:focus, select:focus, textarea:focus {
+      outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    input::placeholder, textarea::placeholder { color: var(--muted); opacity: .7; }
     input[name="code"] { flex: 1; min-width: 180px; }
     button, .btn {
       padding: .6rem 1.1rem; border: 0; border-radius: 10px; background: var(--accent);
-      color: #052e1a; font-weight: 700; cursor: pointer; min-height: 44px; font-size: .88rem;
+      color: var(--accent-ink); font-weight: 700; cursor: pointer; min-height: 44px; font-size: .88rem;
       display: inline-flex; align-items: center; gap: .4rem; text-decoration: none;
-      transition: filter .12s ease, transform .12s ease;
+      transition: filter .12s ease, transform .12s ease, box-shadow .12s ease;
     }
-    button:hover, .btn:hover { filter: brightness(1.1); }
+    button:hover, .btn:hover { filter: brightness(1.08); box-shadow: 0 4px 14px var(--accent-soft); }
     button:active, .btn:active { transform: scale(.98); }
+    button:focus-visible, .btn:focus-visible, a:focus-visible, .icon-btn:focus-visible {
+      outline: 2px solid var(--accent); outline-offset: 2px;
+    }
     button.ghost { background: transparent; color: var(--text); border: 1px solid var(--border-strong); font-weight: 600; }
-    button.ghost:hover { border-color: var(--accent); color: var(--accent); }
+    button.ghost:hover { border-color: var(--accent); color: var(--accent); box-shadow: none; }
+    button.subtle {
+      background: transparent; color: var(--muted); border: 1px dashed var(--border-strong);
+      font-weight: 600; min-height: 38px; padding: .35rem .8rem; font-size: .8rem;
+    }
+    button.subtle:hover { color: var(--accent); border-color: var(--accent); }
 
     .toolbar { display: flex; justify-content: space-between; align-items: center; gap: .75rem; flex-wrap: wrap; margin-bottom: .75rem; }
     .toolbar label { color: var(--muted); font-size: .8rem; display: flex; align-items: center; gap: .4rem; }
+    .toolbar .tool-actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 
     .table-wrap {
-      overflow: auto; max-height: 30rem; background: var(--card);
-      border: 1px solid var(--border); border-radius: var(--radius);
+      overflow: auto; max-height: 32rem; background: var(--card);
+      border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
     }
-    table { width: 100%; border-collapse: collapse; min-width: 720px; }
+    table { width: 100%; border-collapse: collapse; min-width: 780px; }
     th, td { padding: .68rem .9rem; text-align: left; border-bottom: 1px solid var(--border); font-size: .88rem; }
     th {
       color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: .7rem;
@@ -91,36 +158,55 @@
     }
     tbody tr { transition: background .12s ease; }
     tbody tr:hover { background: var(--card-hover); }
-    td a { color: var(--accent); text-decoration: none; }
+    tbody tr { animation: rowIn .28s ease both; animation-delay: calc(var(--i, 0) * 22ms); }
+    @keyframes rowIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+    td a { color: var(--accent); text-decoration: none; font-weight: 600; }
     td a:hover { text-decoration: underline; }
-    .url-cell { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
-    .url-cell a { color: var(--muted); }
+    .url-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+    .url-cell a { color: var(--muted); font-weight: 400; }
     .url-cell a:hover { color: var(--accent); }
     .clicks-badge {
       display: inline-block; min-width: 2.2rem; text-align: center; font-variant-numeric: tabular-nums;
       background: var(--accent-soft); color: var(--accent); font-weight: 700;
       border-radius: 999px; padding: .1rem .55rem; font-size: .8rem;
     }
-    .clicks-badge.zero { background: rgba(148, 163, 184, .12); color: var(--muted); font-weight: 500; }
+    .clicks-badge.zero { background: var(--border); color: var(--muted); font-weight: 500; }
+    .spark-cell { white-space: nowrap; }
+    .spark { vertical-align: middle; }
+    .spark-line { fill: none; stroke: var(--spark-line); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .spark-area { fill: var(--spark-area); stroke: none; }
+    .spark-total { color: var(--muted); font-size: .72rem; margin-left: .4rem; font-variant-numeric: tabular-nums; }
+    .expiry-badge {
+      display: inline-block; border-radius: 999px; padding: .1rem .55rem; font-size: .72rem; font-weight: 600;
+      white-space: nowrap;
+    }
+    .expiry-badge.never { background: transparent; color: var(--muted); opacity: .7; }
+    .expiry-badge.live { background: var(--accent-soft); color: var(--accent); }
+    .expiry-badge.soon { background: var(--amber-soft); color: var(--amber); }
+    .expiry-badge.expired { background: var(--danger-soft); color: var(--danger); }
     .actions { display: flex; gap: .3rem; }
     .icon-btn {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border);
+      width: 34px; height: 34px; border-radius: var(--radius-sm); border: 1px solid var(--border);
       background: transparent; color: var(--muted); cursor: pointer; min-height: 0; padding: 0;
       transition: all .12s ease;
     }
-    .icon-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
-    .icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); background: rgba(248, 113, 113, .1); }
+    .icon-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); transform: translateY(-1px); }
+    .icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
     .icon-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .icon-btn.warm { color: var(--amber); border-color: rgba(251, 191, 36, .5); }
+    .icon-btn.warm { color: var(--amber); border-color: var(--amber-soft); }
+    .icon-btn.warm:hover { color: var(--amber); border-color: var(--amber); background: var(--amber-soft); }
 
     ol.top-list { list-style: none; }
     ol.top-list li {
       display: flex; justify-content: space-between; align-items: center; gap: .75rem;
       padding: .5rem 0; border-bottom: 1px dashed var(--border);
+      transition: padding-left .15s ease;
     }
+    ol.top-list li:hover { padding-left: .3rem; }
     ol.top-list li:last-child { border-bottom: 0; }
     ol.top-list .rank { color: var(--muted); font-size: .78rem; width: 1.2rem; }
+    ol.top-list li:nth-child(1) .rank { color: var(--amber); font-weight: 700; }
     ol.top-list a { color: var(--text); text-decoration: none; font-weight: 600; font-size: .86rem; }
     ol.top-list a:hover { color: var(--accent); }
     ol.top-list .dest { color: var(--muted); font-size: .74rem; display: block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -129,35 +215,72 @@
     details.admin summary {
       cursor: pointer; padding: .8rem 1.1rem; font-weight: 700; font-size: .9rem;
       color: var(--amber); list-style: none; display: flex; align-items: center; gap: .5rem;
+      border-radius: var(--radius); transition: background .15s ease;
     }
+    details.admin summary:hover { background: var(--amber-soft); }
     details.admin summary::-webkit-details-marker { display: none; }
-    details.admin[open] summary { border-bottom: 1px solid var(--border); }
-    details.admin .body { padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: .75rem; }
+    details.admin[open] summary { border-bottom: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0; }
+    details.admin .body { padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: .9rem; }
     .field { display: flex; flex-direction: column; gap: .3rem; }
-    .field span { color: var(--muted); font-size: .78rem; }
-    .field input { width: 100%; }
+    .field > span { color: var(--muted); font-size: .78rem; }
+    .field input, .field textarea { width: 100%; }
+    .row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
     .note { color: var(--muted); font-size: .76rem; }
     .note strong { color: var(--amber); }
+    .checkbox-row { display: flex; align-items: center; gap: .45rem; color: var(--muted); font-size: .82rem; }
+    .checkbox-row input[type="checkbox"] { min-height: 0; width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+    /* ---- dialogs ---- */
+    dialog {
+      border: 1px solid var(--border-strong); border-radius: 14px; padding: 0;
+      background: var(--card); color: var(--text); box-shadow: 0 20px 60px rgba(2, 6, 23, .5);
+      width: min(480px, calc(100vw - 2rem));
+    }
+    dialog::backdrop { background: rgba(2, 6, 23, .55); backdrop-filter: blur(3px); }
+    dialog .dlg-head {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 1rem 1.2rem; border-bottom: 1px solid var(--border); font-weight: 700;
+    }
+    dialog .dlg-body { padding: 1.2rem; display: flex; flex-direction: column; gap: .9rem; }
+    dialog .dlg-foot { display: flex; justify-content: flex-end; gap: .6rem; padding: 0 1.2rem 1.2rem; }
+    .dlg-close {
+      background: transparent; border: 0; color: var(--muted); cursor: pointer;
+      min-height: 0; padding: .2rem; border-radius: 6px; font-size: 1.1rem; line-height: 1;
+    }
+    .dlg-close:hover { color: var(--text); }
+    .dlg-dest { color: var(--muted); font-size: .84rem; word-break: break-all; }
+    .click-log { list-style: none; max-height: 220px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+    .click-log li {
+      display: flex; justify-content: space-between; gap: .75rem; padding: .45rem .7rem;
+      border-bottom: 1px dashed var(--border); font-size: .78rem; color: var(--muted);
+    }
+    .click-log li:last-child { border-bottom: 0; }
+    .click-log .ua { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .confirm-text { color: var(--muted); font-size: .88rem; }
+    .confirm-text strong { color: var(--danger); }
 
     .empty { text-align: center; padding: 2.5rem 1rem; color: var(--muted); }
-    .empty .big { font-size: 2rem; margin-bottom: .5rem; }
-    code.inline { background: rgba(148, 163, 184, .12); padding: .1rem .4rem; border-radius: 6px; font-size: .82em; }
+    .empty .big { font-size: 2rem; margin-bottom: .5rem; display: inline-block; animation: bob 2.4s ease-in-out infinite; }
+    @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+    code.inline { background: var(--border); padding: .1rem .4rem; border-radius: 6px; font-size: .82em; }
     .error { color: var(--danger); }
     .muted { color: var(--muted); }
     .success { color: var(--accent); }
 
     #toast {
-      position: fixed; bottom: 1.25rem; right: 1.25rem; z-index: 50;
+      position: fixed; bottom: 1.25rem; right: 1.25rem; z-index: 60;
       background: var(--card); color: var(--text); border: 1px solid var(--border-strong);
       border-left: 3px solid var(--accent); border-radius: 10px; padding: .7rem 1rem;
       font-size: .85rem; box-shadow: var(--shadow); opacity: 0; transform: translateY(8px);
-      transition: opacity .2s ease, transform .2s ease; pointer-events: none; max-width: 320px;
+      transition: opacity .2s ease, transform .2s ease; pointer-events: none; max-width: 340px;
+      display: flex; align-items: center; gap: .5rem;
     }
     #toast.show { opacity: 1; transform: translateY(0); }
     #toast.error { border-left-color: var(--danger); }
+    #toast .t-icon { font-size: 1rem; }
 
     ::-webkit-scrollbar { width: 10px; height: 10px; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 8px; }
+    ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 8px; }
     ::-webkit-scrollbar-track { background: transparent; }
 
     footer {
@@ -165,8 +288,13 @@
       font-size: .78rem; border-top: 1px solid var(--border);
     }
     footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
     @media (max-width: 640px) {
       header, footer { padding-left: 1rem; padding-right: 1rem; }
+      .tagline .hide-sm { display: none; }
       .url-cell { max-width: 150px; }
       main { padding-top: 1.1rem; }
     }
@@ -175,7 +303,16 @@
 <body>
 <header>
   <div class="logo">shortly<span>-url</span> ⚡</div>
-  <div class="tagline">link shortener · live panel <span class="pill">v{{ version }}</span></div>
+  <div class="head-actions">
+    <div class="tagline">
+      <span class="hide-sm">link shortener · live panel</span>
+      <span class="pill">v{{ version }}</span>
+    </div>
+    <button id="themeToggle" type="button" aria-label="Toggle light / dark theme" title="Toggle theme">
+      <svg id="iconMoon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+      <svg id="iconSun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+  </div>
 </header>
 
 <main>
@@ -183,8 +320,9 @@
     <section class="panel error">{{ error }}</section>
   {% else %}
     <section class="cards" aria-label="Summary">
-      <div class="card"><div class="value">{{ summary.total_links }}</div><div class="label">Short links</div></div>
-      <div class="card"><div class="value amber">{{ summary.total_clicks }}</div><div class="label">Total clicks</div></div>
+      <div class="card"><div class="value" data-countup="{{ summary.total_links }}">0</div><div class="label">Short links</div></div>
+      <div class="card"><div class="value amber" data-countup="{{ summary.total_clicks }}">0</div><div class="label">Total clicks</div></div>
+      <div class="card"><div class="value" data-countup="{{ summary.clicks_7d }}">0</div><div class="label">Clicks · last {{ spark_days }}d</div></div>
       <div class="card"><div class="value">{{ summary.total_clicks // summary.total_links if summary.total_links else 0 }}</div><div class="label">Avg clicks / link</div></div>
     </section>
 
@@ -216,6 +354,7 @@
           <p class="muted">→ {{ selected.original_url }}</p>
           <p style="margin-top:.5rem">Total clicks: <strong class="success">{{ selected.total_clicks }}</strong>
              · created {{ selected.created_abs }} ·
+             {% if selected.expiry %}<span class="expiry-badge {{ selected.expiry.state }}" title="{{ selected.expiry.abs }}">⏳ {{ selected.expiry.label }}</span> ·{% endif %}
              <a href="{{ selected.short_url }}/qr" style="color:var(--accent)">QR code</a></p>
         </section>
       {% else %}
@@ -224,7 +363,7 @@
     {% endif %}
 
     <details class="admin">
-      <summary>🔓 Unlock admin — create, edit &amp; delete links from this panel</summary>
+      <summary>🔓 Unlock admin — create, bulk-create, edit, export &amp; delete links</summary>
       <div class="body">
         <p class="note">Your <strong>X-API-Key</strong> is kept only in this browser (sessionStorage) and is sent directly to the API — never stored server-side.</p>
         <div class="field">
@@ -233,9 +372,24 @@
         </div>
         <div class="field">
           <span for="newUrl">Create a new short link</span>
-          <div style="display:flex; gap:.5rem; flex-wrap:wrap">
+          <div class="row">
             <input id="newUrl" placeholder="https://example.com/destination" style="flex:1; min-width:220px">
             <button type="button" id="createBtn">⚡ Shorten</button>
+          </div>
+        </div>
+        <div class="field">
+          <span for="bulkUrls">Bulk create <span class="muted">(one URL per line, max 25)</span></span>
+          <textarea id="bulkUrls" placeholder="https://example.com/page-1&#10;https://example.com/page-2&#10;https://example.com/page-3"></textarea>
+          <div class="row">
+            <button type="button" id="bulkBtn" class="ghost">⚡ Shorten all</button>
+            <span class="note" id="bulkHint"></span>
+          </div>
+        </div>
+        <div class="field">
+          <span>Export</span>
+          <div class="row">
+            <button type="button" id="exportLinksBtn" class="subtle">⬇ Links CSV</button>
+            <span class="note">owner-scoped · click counts included</span>
           </div>
         </div>
       </div>
@@ -257,36 +411,47 @@
       <div class="table-wrap" role="region" aria-label="Links table">
         <table>
           <thead>
-            <tr><th>Code</th><th>Original URL</th><th>Clicks</th><th>Created</th><th>Actions</th></tr>
+            <tr><th>Code</th><th>Original URL</th><th>Clicks</th><th>Last {{ spark_days }}d</th><th>Expires</th><th>Created</th><th>Actions</th></tr>
           </thead>
           <tbody>
             {% for l in links %}
-              <tr data-code="{{ l.code }}">
+              <tr data-code="{{ l.code }}" style="--i: {{ loop.index0 }}">
                 <td><a href="/{{ l.code }}" target="_blank" rel="noopener noreferrer">{{ l.code }}</a></td>
                 <td class="url-cell" title="{{ l.original_url }}">
                   <a href="{{ l.original_url }}" target="_blank" rel="noopener noreferrer">{{ l.original_url_display }}</a>
                 </td>
                 <td><span class="clicks-badge {{ 'zero' if l.clicks == 0 }}">{{ l.clicks }}</span></td>
+                <td class="spark-cell">{{ l.sparkline | safe }}</td>
+                <td>
+                  {% if l.expiry %}
+                    <span class="expiry-badge {{ l.expiry.state }}" title="{{ l.expiry.abs }}">⏳ {{ l.expiry.label }}</span>
+                  {% else %}
+                    <span class="expiry-badge never">—</span>
+                  {% endif %}
+                </td>
                 <td class="muted" title="{{ l.created_abs }}">{{ l.created_rel }}</td>
                 <td>
                   <div class="actions">
                     <button class="icon-btn" title="Copy short URL" aria-label="Copy short URL for {{ l.code }}" onclick="copyUrl('{{ l.short_url }}', this)">
                       <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     </button>
+                    <button class="icon-btn" title="Insights &amp; recent clicks" aria-label="Insights for {{ l.code }}" onclick="openDetail('{{ l.code }}')">
+                      <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15v-4m5 4V7m5 12v-7"/></svg>
+                    </button>
                     <a class="icon-btn" title="QR code" aria-label="QR code for {{ l.code }}" href="{{ l.short_url }}/qr" target="_blank" rel="noopener noreferrer">
                       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM21 14v7h-7v-3"/></svg>
                     </a>
-                    <button class="icon-btn warm admin-only" title="Edit destination" aria-label="Edit destination of {{ l.code }}" onclick="editLink('{{ l.code }}')">
+                    <button class="icon-btn warm admin-only" title="Edit destination / expiry" aria-label="Edit {{ l.code }}" onclick="openEdit('{{ l.code }}', this)">
                       <svg viewBox="0 0 24 24"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
                     </button>
-                    <button class="icon-btn danger admin-only" title="Delete link" aria-label="Delete {{ l.code }}" onclick="deleteLink('{{ l.code }}')">
+                    <button class="icon-btn danger admin-only" title="Delete link" aria-label="Delete {{ l.code }}" onclick="askDelete('{{ l.code }}')">
                       <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
                     </button>
                   </div>
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="5">
+              <tr><td colspan="7">
                 <div class="empty">
                   <div class="big">⚡</div>
                   No links yet — unlock admin above and create your first one,<br>
@@ -301,7 +466,58 @@
   {% endif %}
 </main>
 
-<div id="toast" role="status" aria-live="polite"></div>
+<!-- Edit dialog -->
+<dialog id="editDlg" aria-labelledby="editDlgTitle">
+  <form method="dialog" style="display:contents">
+  <div class="dlg-head"><span id="editDlgTitle">Edit link</span><button type="button" class="dlg-close" onclick="editDlg.close()">✕</button></div>
+  <div class="dlg-body">
+    <div class="field">
+      <span>Short code</span>
+      <input id="editCode" readonly aria-readonly="true">
+    </div>
+    <div class="field">
+      <span for="editUrl">Destination URL</span>
+      <input id="editUrl" placeholder="https://example.com/new-destination">
+    </div>
+    <div class="field">
+      <span for="editExpiry">Expiry (optional)</span>
+      <input id="editExpiry" type="datetime-local">
+      <label class="checkbox-row"><input id="editNoExpiry" type="checkbox"> No expiry (clears any set expiry)</label>
+    </div>
+  </div>
+  <div class="dlg-foot">
+    <button type="button" class="ghost" onclick="editDlg.close()">Cancel</button>
+    <button type="button" id="editSaveBtn">Save changes</button>
+  </div>
+  </form>
+</dialog>
+
+<!-- Delete confirm dialog -->
+<dialog id="confirmDlg" aria-labelledby="confirmDlgTitle">
+  <div class="dlg-head"><span id="confirmDlgTitle">Delete link</span><button type="button" class="dlg-close" onclick="confirmDlg.close()">✕</button></div>
+  <div class="dlg-body">
+    <p class="confirm-text">Delete <strong id="confirmCode" style="font-family:monospace"></strong> and all of its click history? This cannot be undone.</p>
+  </div>
+  <div class="dlg-foot">
+    <button type="button" class="ghost" onclick="confirmDlg.close()">Cancel</button>
+    <button type="button" id="confirmDeleteBtn" style="background:var(--danger); color:#fff">Delete</button>
+  </div>
+</dialog>
+
+<!-- Detail / insights dialog -->
+<dialog id="detailDlg" aria-labelledby="detailDlgTitle">
+  <div class="dlg-head"><span id="detailDlgTitle">Insights</span><button type="button" class="dlg-close" onclick="detailDlg.close()">✕</button></div>
+  <div class="dlg-body">
+    <div id="detailMeta" class="dlg-dest"></div>
+    <div class="click-log" id="detailClicks"><div class="empty">Loading…</div></div>
+    <div class="row">
+      <button type="button" id="detailExportBtn" class="subtle">⬇ Clicks CSV</button>
+      <span class="note">individual clicks, newest first</span>
+    </div>
+  </div>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"><span class="t-icon" id="toastIcon">✓</span><span id="toastMsg"></span></div>
 
 <footer>
   shortly-url v{{ version }} · FastAPI + PostgreSQL + Redis ·
@@ -311,15 +527,43 @@
 
 <script>
   const $ = (sel) => document.querySelector(sel);
+  const editDlg = $('#editDlg'), confirmDlg = $('#confirmDlg'), detailDlg = $('#detailDlg');
   let toastTimer;
-  function showToast(message, isError = false) {
+  function showToast(message, isError = false, icon) {
     const el = $('#toast');
-    el.textContent = message;
+    $('#toastMsg').textContent = message;
+    $('#toastIcon').textContent = icon || (isError ? '⚠️' : '✓');
     el.classList.toggle('error', isError);
     el.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
   }
+
+  /* ---- theme ---- */
+  $('#themeToggle').addEventListener('click', () => {
+    const root = document.documentElement;
+    const next = root.dataset.theme === 'light' ? 'dark' : 'light';
+    root.dataset.theme = next;
+    localStorage.setItem('shortlyTheme', next);
+  });
+
+  /* ---- count-up cards ---- */
+  (function countUp() {
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.querySelectorAll('[data-countup]').forEach((el) => {
+      const target = parseInt(el.dataset.countup || '0', 10);
+      if (reduce || target === 0) { el.textContent = target; return; }
+      const dur = 700, t0 = performance.now();
+      const tick = (t) => {
+        const p = Math.min(1, (t - t0) / dur);
+        el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3)));
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+  })();
+
+  /* ---- clipboard ---- */
   async function copyUrl(url, btn) {
     try {
       await navigator.clipboard.writeText(url);
@@ -331,9 +575,9 @@
       }
     } catch { showToast('Clipboard unavailable — long-press the link instead', true); }
   }
-  function getKey() {
-    return sessionStorage.getItem('shortlyKey') || '';
-  }
+
+  /* ---- admin key ---- */
+  function getKey() { return sessionStorage.getItem('shortlyKey') || ''; }
   function requireKey() {
     let key = getKey();
     if (!key) {
@@ -350,6 +594,8 @@
     const hasKey = !!getKey();
     document.querySelectorAll('.admin-only').forEach((el) => { el.style.opacity = hasKey ? '1' : '.45'; });
   }
+
+  /* ---- create ---- */
   async function createLink() {
     const key = requireKey(); if (!key) return;
     const url = $('#newUrl').value.trim();
@@ -357,33 +603,145 @@
     try {
       const res = await fetch('/api/shorten', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ url }) });
       const body = await res.json();
-      if (res.status === 201) { showToast('Created ' + body.code); $('#newUrl').value = ''; setTimeout(() => location.reload(), 900); }
+      if (res.status === 201) { showToast('Created ' + body.code, false, '⚡'); $('#newUrl').value = ''; setTimeout(() => location.reload(), 900); }
       else showToast((body.error && body.error.message) || ('Failed: ' + res.status), true);
     } catch { showToast('Network error', true); }
   }
-  async function editLink(code) {
+
+  /* ---- bulk create ---- */
+  async function bulkCreate() {
     const key = requireKey(); if (!key) return;
-    const url = prompt('New destination URL for ' + code + ':');
-    if (!url) return;
+    const urls = $('#bulkUrls').value.split('\n').map((s) => s.trim()).filter(Boolean);
+    if (!urls.length) { showToast('Paste at least one URL (one per line)', true); return; }
+    if (urls.length > 25) { showToast('Max 25 URLs per batch', true); return; }
+    const btn = $('#bulkBtn'); btn.disabled = true; btn.textContent = 'Working…';
     try {
-      const res = await fetch('/api/links/' + code, { method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ url }) });
-      if (res.status === 200) { showToast(code + ' now points to ' + url); setTimeout(() => location.reload(), 900); }
+      const res = await fetch('/api/shorten/bulk', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ urls }) });
+      const body = await res.json();
+      if (res.status === 201) {
+        $('#bulkHint').textContent = `created ${body.created} · duplicates ${body.duplicate} · errors ${body.errors}`;
+        showToast(`Bulk done: ${body.created} created, ${body.duplicate} duplicates`, false, '⚡');
+        setTimeout(() => location.reload(), 1200);
+      } else showToast((body.error && body.error.message) || ('Failed: ' + res.status), true);
+    } catch { showToast('Network error', true); }
+    finally { btn.disabled = false; btn.textContent = '⚡ Shorten all'; }
+  }
+
+  /* ---- helpers for dates ---- */
+  function toLocalInput(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  /* ---- edit dialog ---- */
+  function openEdit(code, btn) {
+    const key = requireKey(); if (!key) return;
+    $('#editCode').value = code;
+    $('#editUrl').value = btn ? (btn.closest('tr')?.querySelector('.url-cell a')?.href || '') : '';
+    $('#editExpiry').value = '';
+    $('#editNoExpiry').checked = false;
+    // Pre-fill the current expiry from the API (best effort).
+    fetch('/api/links/' + encodeURIComponent(code), { headers: { 'X-API-Key': key } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return;
+        if (!$('#editUrl').value) $('#editUrl').value = data.original_url || '';
+        if (data.expires_at) $('#editExpiry').value = toLocalInput(data.expires_at);
+      });
+    editDlg.showModal();
+  }
+  async function saveEdit() {
+    const key = requireKey(); if (!key) return;
+    const code = $('#editCode').value.trim();
+    const url = $('#editUrl').value.trim();
+    if (!url) { showToast('Destination URL is required', true); return; }
+    const payload = { url };
+    if ($('#editNoExpiry').checked) payload.expires_at = null;
+    else if ($('#editExpiry').value) payload.expires_at = new Date($('#editExpiry').value).toISOString();
+    try {
+      const res = await fetch('/api/links/' + encodeURIComponent(code), {
+        method: 'PATCH', headers: authHeaders(), body: JSON.stringify(payload),
+      });
+      if (res.status === 200) { showToast('Saved ' + code, false, '💾'); editDlg.close(); setTimeout(() => location.reload(), 900); }
       else { const b = await res.json().catch(() => ({})); showToast((b.error && b.error.message) || ('Failed: ' + res.status), true); }
     } catch { showToast('Network error', true); }
   }
-  async function deleteLink(code) {
+
+  /* ---- delete dialog ---- */
+  function askDelete(code) {
     const key = requireKey(); if (!key) return;
-    if (!confirm('Delete ' + code + ' and all its click history?')) return;
-    try {
-      const res = await fetch('/api/links/' + code, { method: 'DELETE', headers: { 'X-API-Key': key } });
-      if (res.status === 204) { showToast('Deleted ' + code); setTimeout(() => location.reload(), 900); }
-      else { const b = await res.json().catch(() => ({})); showToast((b.error && b.error.message) || ('Failed: ' + res.status), true); }
-    } catch { showToast('Network error', true); }
+    $('#confirmCode').textContent = code;
+    $('#confirmDeleteBtn').onclick = async () => {
+      try {
+        const res = await fetch('/api/links/' + encodeURIComponent(code), { method: 'DELETE', headers: { 'X-API-Key': key } });
+        if (res.status === 204) { showToast('Deleted ' + code, false, '🗑️'); confirmDlg.close(); setTimeout(() => location.reload(), 900); }
+        else { const b = await res.json().catch(() => ({})); showToast((b.error && b.error.message) || ('Failed: ' + res.status), true); }
+      } catch { showToast('Network error', true); }
+    };
+    confirmDlg.showModal();
   }
+
+  /* ---- detail dialog ---- */
+  let detailCode = '';
+  async function openDetail(code) {
+    const key = requireKey(); if (!key) return;
+    detailCode = code;
+    $('#detailDlgTitle').textContent = 'Insights · ' + code;
+    $('#detailMeta').textContent = 'Loading…';
+    $('#detailClicks').innerHTML = '<div class="empty">Loading…</div>';
+    detailDlg.showModal();
+    try {
+      const res = await fetch('/api/links/' + encodeURIComponent(code), { headers: { 'X-API-Key': key } });
+      if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error((b.error && b.error.message) || res.status); }
+      const data = await res.json();
+      const expiry = data.expires_at ? ' · ⏳ expires ' + new Date(data.expires_at).toLocaleString() : '';
+      $('#detailMeta').innerHTML = '<strong>→</strong> ' + (data.original_url || '') + expiry
+        + ' · <strong>' + data.total_clicks + '</strong> total clicks';
+      const log = $('#detailClicks');
+      if (!data.recent_clicks || !data.recent_clicks.length) {
+        log.innerHTML = '<div class="empty">No clicks recorded yet.</div>';
+      } else {
+        log.innerHTML = data.recent_clicks.map((c) => {
+          const t = new Date(c.clicked_at).toLocaleString();
+          return '<li><span>' + t + '</span><span class="ua" title="' + (c.user_agent || '') + '">'
+            + (c.ip_hash || '—') + '</span></li>';
+        }).join('');
+      }
+    } catch (e) { $('#detailMeta').textContent = 'Failed to load insights: ' + e.message; }
+  }
+  async function exportClicksCsv() {
+    const key = requireKey(); if (!key || !detailCode) return;
+    await downloadFile('/api/stats/' + encodeURIComponent(detailCode) + '/export', detailCode + '-clicks.csv', key);
+  }
+  async function exportLinksCsv() {
+    const key = requireKey(); if (!key) return;
+    await downloadFile('/api/links/export', 'shortly-links.csv', key);
+  }
+  async function downloadFile(url, filename, key) {
+    try {
+      const res = await fetch(url, { headers: { 'X-API-Key': key } });
+      if (!res.ok) { showToast('Export failed: ' + res.status, true); return; }
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      showToast('Downloaded ' + filename, false, '⬇');
+    } catch { showToast('Download failed', true); }
+  }
+
   $('#createBtn') && $('#createBtn').addEventListener('click', createLink);
+  $('#bulkBtn') && $('#bulkBtn').addEventListener('click', bulkCreate);
+  $('#editSaveBtn') && $('#editSaveBtn').addEventListener('click', saveEdit);
+  $('#detailExportBtn') && $('#detailExportBtn').addEventListener('click', exportClicksCsv);
+  $('#exportLinksBtn') && $('#exportLinksBtn').addEventListener('click', exportLinksCsv);
   $('#adminKey') && $('#adminKey').addEventListener('change', (e) => {
     if (e.target.value.trim()) { sessionStorage.setItem('shortlyKey', e.target.value.trim()); refreshAdminState(); showToast('Admin unlocked for this browser session'); }
   });
+  $('#newUrl') && $('#newUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') createLink(); });
   refreshAdminState();
 </script>
 </body>
