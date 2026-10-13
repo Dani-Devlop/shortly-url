@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.redis import get_redis
-from app.models import Click, Link
+from app.models import Click, Link, LinkTag
 
 settings = get_settings()
 
@@ -231,6 +231,57 @@ async def get_clicks_by_hour_for_links(
     for dow_value, hour_value, clicks in rows.all():
         cells[(int(dow_value), int(hour_value))] = int(clicks)
     return cells
+
+
+async def get_tag_rollup(
+    db: AsyncSession, owner_id: int | None, days: int = 30
+) -> list[dict[str, int | str]]:
+    """Click analytics aggregated per tag over a rolling window.
+
+    ``owner_id=None`` aggregates across ALL links (single-tenant dashboard
+    view); an integer scopes the rollup to that owner's links. Returns one
+    entry per tag carried by the in-scope links (zero-click tags included):
+    ``{"tag", "links", "clicks", "unique_visitors"}`` ranked by clicks desc,
+    ties alphabetical. ``links`` counts the in-scope links carrying the tag
+    (all-time, not window-limited). Two grouped queries.
+    """
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+    click_stmt = (
+        select(
+            LinkTag.tag,
+            func.count(Click.id).label("clicks"),
+            func.count(func.distinct(Click.ip_hash)).label("visitors"),
+        )
+        .select_from(Click)
+        .join(LinkTag, LinkTag.link_id == Click.link_id)
+        .join(Link, Link.id == Click.link_id)
+        .where(Click.clicked_at >= cutoff)
+    )
+    link_stmt = (
+        select(LinkTag.tag, func.count(func.distinct(LinkTag.link_id)))
+        .select_from(LinkTag)
+        .join(Link, Link.id == LinkTag.link_id)
+    )
+    if owner_id is not None:
+        click_stmt = click_stmt.where(Link.owner_id == owner_id)
+        link_stmt = link_stmt.where(Link.owner_id == owner_id)
+    click_rows = await db.execute(click_stmt.group_by(LinkTag.tag))
+    click_map = {str(tag): (int(clicks), int(visitors or 0)) for tag, clicks, visitors in click_rows.all()}
+    link_rows = await db.execute(link_stmt.group_by(LinkTag.tag))
+    link_map = {str(tag): int(n) for tag, n in link_rows.all()}
+    items: list[dict[str, int | str]] = []
+    for tag in set(link_map) | set(click_map):
+        clicks, visitors = click_map.get(tag, (0, 0))
+        items.append(
+            {
+                "tag": tag,
+                "links": link_map.get(tag, 0),
+                "clicks": clicks,
+                "unique_visitors": visitors,
+            }
+        )
+    items.sort(key=lambda item: (-int(item["clicks"]), str(item["tag"])))
+    return items
 
 
 async def get_daily_clicks_for_links(

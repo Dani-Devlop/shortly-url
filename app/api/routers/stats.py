@@ -3,6 +3,7 @@ global device mix, windowed referrers, global activity feed, per-link CSV."""
 
 import csv
 import io
+import re
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -11,11 +12,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.exceptions import NotFoundError
+from app.core.exceptions import ValidationError as SemanticValidationError
 from app.db.session import get_db
 from app.models import Link, User
 from app.schemas.link import (
     ActivityItem,
     ActivityOut,
+    CompareItem,
+    CompareOut,
     DailyStatPoint,
     DailyStats,
     DeviceBreakdownOut,
@@ -27,9 +31,12 @@ from app.schemas.link import (
     SparklineItem,
     SparklinesOut,
     StatsOut,
+    TagRollupItem,
+    TagRollupOut,
 )
 from app.services.link_service import get_link_by_code
 from app.services.stats_service import (
+    count_clicks,
     count_unique_clicks,
     get_clicks_by_hour_for_links,
     get_daily_clicks,
@@ -38,6 +45,7 @@ from app.services.stats_service import (
     get_recent_clicks,
     get_recent_clicks_global,
     get_referrer_stats,
+    get_tag_rollup,
     get_total_clicks,
 )
 
@@ -154,6 +162,108 @@ async def activity_feed(
         for click, code in rows
     ]
     return ActivityOut(items=items, limit=limit)
+
+
+@router.get("/tags", response_model=TagRollupOut)
+async def tag_rollup(
+    days: int = Query(default=30, ge=1, le=90),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> TagRollupOut:
+    """Click performance aggregated per tag across the caller's links.
+
+    Every tag the caller uses is returned (zero-click tags included), ranked
+    by clicks in the window, ties alphabetical. ``links`` counts the caller's
+    links carrying the tag all-time.
+
+    NOTE: registered before ``/{code}`` so "tags" is never read as a code.
+    """
+    items = await get_tag_rollup(db, user.id, days=days)
+    rollup = [
+        TagRollupItem(
+            tag=str(item["tag"]),
+            links=int(item["links"]),
+            clicks=int(item["clicks"]),
+            unique_visitors=int(item["unique_visitors"]),
+        )
+        for item in items
+    ]
+    return TagRollupOut(
+        window_days=days,
+        total_clicks=sum(item.clicks for item in rollup),
+        items=rollup,
+    )
+
+
+@router.get("/tags/export", response_class=Response, include_in_schema=False)
+async def export_tags_csv(
+    days: int = Query(default=30, ge=1, le=90),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """CSV rollup of click performance per tag (same data as ``/api/stats/tags``)."""
+    items = await get_tag_rollup(db, user.id, days=days)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(["tag", "links", "clicks", "unique_visitors"])
+    for item in items:
+        writer.writerow(
+            [item["tag"], item["links"], item["clicks"], item["unique_visitors"]]
+        )
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="shortly-tags.csv"'},
+    )
+
+
+_CODE_SPLIT_RE = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
+
+
+@router.get("/compare", response_model=CompareOut)
+async def compare_codes(
+    codes: str = Query(
+        ...,
+        min_length=3,
+        max_length=80,
+        description="Exactly two short codes, comma-separated (e.g. codes=a,b).",
+    ),
+    days: int = Query(default=14, ge=1, le=90),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> CompareOut:
+    """Side-by-side comparison of exactly two of the caller's links.
+
+    Returns per-code totals, unique visitors and a zero-filled daily series
+    over the window (one grouped query). Unknown or foreign codes → 404.
+    """
+    parts = [part.strip() for part in codes.split(",")]
+    parts = [part for part in parts if part]
+    if len(parts) != 2:
+        raise SemanticValidationError("provide exactly two codes, e.g. codes=a,b")
+    if parts[0] == parts[1]:
+        raise SemanticValidationError("pick two different codes to compare")
+    for part in parts:
+        if not _CODE_SPLIT_RE.match(part):
+            raise SemanticValidationError(f"invalid short code '{part[:32]}'")
+    links = []
+    for code in parts:
+        link = await get_link_by_code(db, code)
+        if link is None or link.owner_id != user.id:
+            raise NotFoundError(f"Short code '{code}' does not exist")
+        links.append(link)
+    series = await get_daily_clicks_for_links(db, [link.id for link in links], days=days)
+    items = [
+        CompareItem(
+            code=link.code,
+            original_url=link.original_url,
+            total_clicks=await count_clicks(db, link.id),
+            unique_clicks=await count_unique_clicks(db, link.id),
+            points=series.get(link.id, [0] * days),
+        )
+        for link in links
+    ]
+    return CompareOut(window_days=days, items=items)
 
 
 @router.get("/{code}", response_model=StatsOut)

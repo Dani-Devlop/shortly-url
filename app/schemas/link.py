@@ -307,3 +307,94 @@ class ActivityOut(BaseModel):
 
     items: list[ActivityItem]
     limit: int
+
+
+class TagRollupItem(BaseModel):
+    """One tag's aggregated performance."""
+
+    tag: str
+    links: int = Field(description="Owner's links carrying this tag (all-time).")
+    clicks: int = Field(description="Clicks on those links within the window.")
+    unique_visitors: int = Field(
+        description="Distinct visitors (unique ip_hash) within the window."
+    )
+
+
+class TagRollupOut(BaseModel):
+    """Envelope for GET /api/stats/tags."""
+
+    window_days: int
+    total_clicks: int = Field(description="Sum of clicks across returned tags.")
+    items: list[TagRollupItem]
+
+
+class CompareItem(BaseModel):
+    """One side of a two-code comparison."""
+
+    code: str
+    original_url: str
+    total_clicks: int
+    unique_clicks: int
+    points: list[int] = Field(
+        description="Zero-filled daily clicks, oldest → newest, window_days long."
+    )
+
+
+class CompareOut(BaseModel):
+    """Envelope for GET /api/stats/compare."""
+
+    window_days: int
+    items: list[CompareItem] = Field(description="Exactly two entries, request order.")
+
+
+class TagRenameRequest(BaseModel):
+    """Body for POST /api/tags/rename."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    source: str = Field(
+        alias="from",
+        min_length=1,
+        max_length=64,
+        description="Current tag name (normalised like link tags: spaces become '-').",
+    )
+    target: str = Field(
+        alias="to",
+        min_length=1,
+        max_length=64,
+        description="New tag name. If a link already carries the target, the two are merged.",
+    )
+
+    @model_validator(mode="after")
+    def _validate(self) -> "TagRenameRequest":
+        from app.core.tags import normalize_tags
+
+        try:
+            source = normalize_tags([self.source])
+            target = normalize_tags([self.target])
+        except ValueError as exc:
+            raise ValueError(str(exc)) from None
+        if not source or not target:
+            raise ValueError("provide both 'from' and 'to' tag names")
+        if source[0] == target[0]:
+            raise ValueError("'from' and 'to' must be different tags")
+        self.source = source[0]
+        self.target = target[0]
+        return self
+
+
+class TagActionOut(BaseModel):
+    """Response for tag rename / delete operations."""
+
+    tag: str = Field(description="The tag the action targeted (normalised).")
+    links_updated: int = Field(
+        description="Links whose tag rows were added or rewritten."
+    )
+    links_merged: int = Field(
+        default=0,
+        description="Rename only: links that already had the target tag and were deduped.",
+    )
+    links_removed: int = Field(
+        default=0,
+        description="Delete only: links the tag was stripped from.",
+    )

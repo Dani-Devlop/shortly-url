@@ -483,6 +483,204 @@
       ]
     },
     {
+      "name": "Stats — Tag Rollup",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/stats/tags?days=30",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "stats",
+            "tags?days=30"
+          ],
+          "query": [
+            {
+              "key": "days",
+              "value": "30",
+              "description": "rolling window 1-90"
+            }
+          ]
+        },
+        "description": "Click performance aggregated per tag across the caller's links. Every tag is returned (zero-click included), ranked by clicks desc. Returns {window_days, total_clicks, items:[{tag, links, clicks, unique_visitors}]}. CSV rollup at /api/stats/tags/export."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('envelope has window_days/total_clicks/items', () => {",
+              "    pm.expect(body).to.have.property('window_days');",
+              "    pm.expect(body).to.have.property('total_clicks');",
+              "    pm.expect(body.items).to.be.an('array');",
+              "});",
+              "pm.test('sum of item clicks equals total_clicks', () => {",
+              "    pm.expect(body.items.reduce((a, i) => a + i.clicks, 0)).to.eql(body.total_clicks);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stats — Compare Two Codes",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/stats/compare?codes=repo,pydocs&days=14",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "stats",
+            "compare?codes=repo"
+          ],
+          "query": [
+            {
+              "key": "codes",
+              "value": "repo,pydocs",
+              "description": "exactly two short codes, comma-separated"
+            },
+            {
+              "key": "days",
+              "value": "14",
+              "description": "rolling window 1-90"
+            }
+          ]
+        },
+        "description": "Side-by-side comparison of exactly two of the caller's links. Returns {window_days, items:[{code, original_url, total_clicks, unique_clicks, points[]}]} in request order. Unknown/foreign codes 404; one or three codes 422."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK or 404 (edit codes to your data)', () => {",
+              "    pm.expect([200, 404]).to.include(pm.response.code);",
+              "});",
+              "if (pm.response.code === 200) {",
+              "    const body = pm.response.json();",
+              "    pm.test('exactly two items with equal-length points', () => {",
+              "        pm.expect(body.items).to.have.lengthOf(2);",
+              "        pm.expect(body.items[0].points).to.have.lengthOf(body.window_days);",
+              "        pm.expect(body.items[1].points).to.have.lengthOf(body.window_days);",
+              "    });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tags — Rename (merge)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/tags/rename",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "tags",
+            "rename"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"from\": \"old-tag\", \"to\": \"new-tag\" }"
+        },
+        "description": "Rename a tag across ALL of the caller's links. Links already carrying the target tag are merged (their source row is dropped) so the 6-tags-per-link cap can never break. Normalises like link tags (trim/lowercase, spaces -> '-'). Unknown source tag -> 404."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK or 404 (edit from/to to your data)', () => {",
+              "    pm.expect([200, 404]).to.include(pm.response.code);",
+              "});",
+              "if (pm.response.code === 200) {",
+              "    const body = pm.response.json();",
+              "    pm.test('reports updated/merged counts', () => {",
+              "        pm.expect(body).to.have.property('tag');",
+              "        pm.expect(body).to.have.property('links_updated');",
+              "        pm.expect(body).to.have.property('links_merged');",
+              "    });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tags — Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/tags/example-tag",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "tags",
+            "example-tag"
+          ]
+        },
+        "description": "Strip a tag from every one of the caller's links (the links themselves are kept). Unknown tag -> 404; invalid tag charset -> 422."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK or 404 (edit tag to your data)', () => {",
+              "    pm.expect([200, 404]).to.include(pm.response.code);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "Export — Clicks CSV",
       "event": [
         {

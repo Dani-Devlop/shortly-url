@@ -31,3 +31,8 @@ build/
 .DS_Store
 .idea/
 .vscode/
+
+# local QA helpers & scratch
+ensure_server.sh
+seed_qa.sh
+qa.db*

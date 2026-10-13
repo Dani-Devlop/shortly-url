@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import __version__
-from app.api.routers import health, links, pages, redirects, stats
+from app.api.routers import health, links, pages, redirects, stats, tags
 from app.core.config import get_settings
 from app.core.exceptions import AppError
 from app.core.redis import close_redis, init_redis
@@ -51,6 +51,7 @@ def create_app() -> FastAPI:
     application.include_router(pages.router)
     application.include_router(links.router)
     application.include_router(stats.router)
+    application.include_router(tags.router)
     application.include_router(redirects.router)
 
     @application.exception_handler(AppError)

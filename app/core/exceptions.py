@@ -40,6 +40,17 @@ class NotFoundError(AppError):
         super().__init__(message)
 
 
+class ValidationError(AppError):
+    """Semantic validation failure that pydantic cannot express (e.g. a
+    query combination). Renders through the uniform error envelope."""
+
+    status_code = 422
+    code = "validation_error"
+
+    def __init__(self, message: str = "Request validation failed") -> None:
+        super().__init__(message)
+
+
 class GoneError(AppError):
     status_code = 410
     code = "link_expired"

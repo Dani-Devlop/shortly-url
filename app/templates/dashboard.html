@@ -433,6 +433,73 @@
     .act-empty { color: var(--muted); font-size: .8rem; padding: .25rem .15rem; }
     @keyframes actIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
 
+    /* ---- tag performance panel ---- */
+    .tagperf-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+    .tagperf-row { display: flex; flex-direction: column; gap: .32rem; padding: .5rem .15rem; border-bottom: 1px dashed var(--border); }
+    .tagperf-row:last-child { border-bottom: 0; }
+    .tagperf-top { display: flex; align-items: center; gap: .5rem; font-size: .78rem; }
+    .tagperf-name {
+      font-size: .68rem; font-weight: 700; text-decoration: none; padding: .1rem .5rem;
+      border-radius: 999px; letter-spacing: .02em; white-space: nowrap;
+      background: hsl(var(--tag-h, 152) 55% 17%); color: hsl(var(--tag-h, 152) 70% 64%);
+      border: 1px solid hsl(var(--tag-h, 152) 50% 32% / .55);
+    }
+    [data-theme="light"] .tagperf-name {
+      background: hsl(var(--tag-h, 152) 75% 92%); color: hsl(var(--tag-h, 152) 60% 28%);
+      border-color: hsl(var(--tag-h, 152) 55% 72%);
+    }
+    .tagperf-name:hover { filter: brightness(1.25); }
+    .tagperf-share { color: var(--muted); font-size: .7rem; margin-left: auto; font-variant-numeric: tabular-nums; }
+    .tagperf-count { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; font-size: .8rem; }
+    .tagperf-track { height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; }
+    .tagperf-bar {
+      display: block; height: 100%; border-radius: 999px;
+      background: linear-gradient(90deg, hsl(var(--tag-h, 152) 65% 42% / .8), hsl(var(--tag-h, 152) 75% 55% / .95));
+      transition: width .6s cubic-bezier(.22, 1, .36, 1);
+    }
+    .tagperf-bar.zero { background: var(--border-strong); }
+    .tagperf-meta { color: var(--muted); font-size: .68rem; display: flex; gap: .6rem; flex-wrap: wrap; }
+
+    /* ---- compare dialog ---- */
+    .cmp-cards { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    .cmp-card { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .7rem .8rem .6rem; position: relative; overflow: hidden; }
+    .cmp-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--cmp-color, var(--accent)); }
+    .cmp-card.winner { border-color: var(--cmp-color, var(--accent)); }
+    .cmp-card .cmp-code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700;
+      font-size: .92rem; color: var(--cmp-color, var(--accent)); text-decoration: none;
+    }
+    .cmp-card .cmp-code:hover { text-decoration: underline; }
+    .cmp-badge {
+      position: absolute; top: .55rem; right: .55rem; font-size: .6rem; font-weight: 800;
+      letter-spacing: .06em; text-transform: uppercase; padding: .14rem .5rem; border-radius: 999px;
+      background: var(--cmp-color, var(--accent)); color: var(--bg);
+    }
+    .cmp-line { width: 100%; height: 72px; display: block; margin-top: .4rem; }
+    .cmp-line .cmp-area { opacity: .14; }
+    .cmp-line .cmp-stroke { fill: none; stroke: var(--cmp-color, var(--accent)); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .cmp-stats { display: flex; gap: .9rem; margin-top: .5rem; flex-wrap: wrap; }
+    .cmp-stat { display: flex; flex-direction: column; gap: .05rem; }
+    .cmp-stat .k { color: var(--muted); font-size: .64rem; text-transform: uppercase; letter-spacing: .05em; }
+    .cmp-stat .v { font-weight: 700; font-size: .95rem; font-variant-numeric: tabular-nums; }
+    .cmp-verdict { margin-top: .8rem; font-size: .8rem; color: var(--muted); text-align: center; }
+    .cmp-verdict strong { color: var(--accent); }
+    .cmp-fields { display: flex; gap: .5rem; flex-wrap: wrap; align-items: end; }
+    .cmp-fields label { display: flex; flex-direction: column; gap: .25rem; font-size: .72rem; color: var(--muted); flex: 1; min-width: 120px; }
+    #cmpDlg { width: min(620px, calc(100vw - 2rem)); }
+    #cmpDlg .cmp-fields select { min-height: 36px; }
+    #cmpDlg .cmp-fields .btn { min-height: 36px; align-self: end; }
+
+    /* ---- tag manager (admin) ---- */
+    .tagmgr { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+    .tagmgr select, .tagmgr input { min-height: 36px; }
+    .tagmgr select { max-width: 180px; }
+    .tagmgr input { flex: 1; min-width: 140px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .btn-danger-ghost {
+      background: transparent; border: 1px solid var(--danger); color: var(--danger);
+    }
+    .btn-danger-ghost:hover { background: var(--danger-soft); }
+
     /* ---- insights mini bar chart (last 14 days) ---- */
     .mini-chart { display: flex; align-items: stretch; gap: 3px; height: 56px; padding: .45rem .1rem 0; }
     .mini-chart .bar-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; min-width: 5px; border-radius: 3px; }
@@ -593,6 +660,10 @@
             <li><span class="method get">GET</span><code>/api/stats/{code}/daily</code><span class="desc">per-day series</span></li>
             <li><span class="method get">GET</span><code>/api/stats/{code}/referrers?days</code><span class="desc">sources in window</span></li>
             <li><span class="method get">GET</span><code>/api/stats/devices?days</code><span class="desc">device mix · &amp;exclude_bots</span></li>
+            <li><span class="method get">GET</span><code>/api/stats/tags?days</code><span class="desc">clicks per tag rollup</span></li>
+            <li><span class="method get">GET</span><code>/api/stats/compare?codes=a,b</code><span class="desc">side-by-side compare</span></li>
+            <li><span class="method post">POST</span><code>/api/tags/rename</code><span class="desc">rename / merge a tag</span></li>
+            <li><span class="method del">DELETE</span><code>/api/tags/{tag}</code><span class="desc">strip a tag everywhere</span></li>
             <li><span class="method get">GET</span><code>/{code}</code><span class="desc">redirect 302</span></li>
             <li><span class="method get">GET</span><code>/{code}/qr?format=svg|png&size</code><span class="desc">QR code · 64–1024 px</span></li>
             <li><span class="method get">GET</span><code>/s/{code}</code><span class="desc">public stats page</span></li>
@@ -639,6 +710,26 @@
             </ul>
           {% else %}
             <p class="note">No clicks in the last {{ device_days }} days yet — share a link and watch this fill up.</p>
+          {% endif %}
+        </div>
+        <div class="panel">
+          <h2>🏷 Tag performance <span class="hint">last {{ tag_days }}d · {{ tag_rollup_total }} click{{ 's' if tag_rollup_total != 1 }}</span></h2>
+          {% if tag_rollup %}
+            <ul class="tagperf-list">
+              {% for t in tag_rollup %}
+                <li class="tagperf-row">
+                  <div class="tagperf-top">
+                    <a class="tagperf-name" style="--tag-h: {{ t.hue }}" href="/?tag={{ t.tag }}" title="Show links tagged #{{ t.tag }}">#{{ t.tag }}</a>
+                    <span class="tagperf-count">{{ t.clicks }}</span>
+                    <span class="tagperf-share">{{ t.pct }}% of window</span>
+                  </div>
+                  <div class="tagperf-track"><span class="tagperf-bar {{ 'zero' if t.clicks == 0 }}" style="--tag-h: {{ t.hue }}; width: {{ t.pct if t.pct > 0 else 2 }}%"></span></div>
+                  <div class="tagperf-meta"><span>{{ t.links }} link{{ 's' if t.links != 1 }}</span><span>{{ t.unique }} unique visitor{{ 's' if t.unique != 1 }}</span></div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="note">No tags yet — add tags when creating or editing a link and their traffic ranks here.</p>
           {% endif %}
         </div>
         <div class="panel" id="activityPanel">
@@ -707,8 +798,25 @@
           <span>Export</span>
           <div class="row">
             <button type="button" id="exportLinksBtn" class="subtle">⬇ Links CSV</button>
+            <button type="button" id="exportTagsBtn" class="subtle">⬇ Tags CSV</button>
             <span class="note">owner-scoped · click counts included</span>
           </div>
+        </div>
+        <div class="field">
+          <span for="tagmgrSelect">Tag manager <span class="muted">— rename (merges duplicates) or delete a tag everywhere</span></span>
+          {% if tag_choices %}
+            <div class="tagmgr">
+              <select id="tagmgrSelect" aria-label="Tag to manage">
+                {% for t in tag_choices %}<option value="{{ t }}">#{{ t }}</option>{% endfor %}
+              </select>
+              <input id="tagmgrNew" placeholder="new name (optional) — dev-ops" autocomplete="off" spellcheck="false" aria-label="New tag name">
+              <button type="button" id="tagmgrRenameBtn" class="ghost">✏️ Rename</button>
+              <button type="button" id="tagmgrDeleteBtn" class="btn-danger-ghost">🗑 Delete</button>
+            </div>
+            <span class="note" id="tagmgrHint"></span>
+          {% else %}
+            <p class="note">No tags in use yet.</p>
+          {% endif %}
         </div>
       </div>
     </details>
@@ -724,6 +832,7 @@
           <button type="button" id="autorefBtn" class="autoref" aria-pressed="false" title="Reload this panel every 30 seconds">
             <span class="dot" aria-hidden="true"></span> Auto<span class="count" id="autorefCount"></span>
           </button>
+          <button type="button" id="compareBtn" class="autoref" title="Compare two links side by side" {% if compare_codes | length < 2 %}disabled{% endif %}>⚖️ Compare</button>
           <span class="filter-box">
             <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
             <input id="tableFilter" type="search" placeholder="Filter this page…" aria-label="Filter links on this page" autocomplete="off">
@@ -948,6 +1057,36 @@
   </div>
 </dialog>
 
+<!-- Compare dialog -->
+<dialog id="cmpDlg" aria-labelledby="cmpDlgTitle">
+  <div class="dlg-head"><span id="cmpDlgTitle">⚖️ Compare links</span><button type="button" class="dlg-close" onclick="cmpDlg.close()">✕</button></div>
+  <div class="dlg-body">
+    <div class="cmp-fields">
+      <label>A
+        <select id="cmpA" aria-label="First link to compare">
+          {% for c in compare_codes %}<option value="{{ c }}" {{ 'selected' if loop.index == 1 }}>/{{ c }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>B
+        <select id="cmpB" aria-label="Second link to compare">
+          {% for c in compare_codes %}<option value="{{ c }}" {{ 'selected' if loop.index == 2 }}>/{{ c }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Window
+        <select id="cmpDays" aria-label="Comparison window in days">
+          <option value="7">7 days</option>
+          <option value="14" selected>14 days</option>
+          <option value="30">30 days</option>
+        </select>
+      </label>
+      <button type="button" id="cmpRunBtn" class="btn">Compare</button>
+    </div>
+    <div id="cmpResult" aria-live="polite">
+      <p class="note">Pick two links and hit Compare — totals, unique visitors and the daily trend side by side.</p>
+    </div>
+  </div>
+</dialog>
+
 <div id="toast" role="status" aria-live="polite"><span class="t-icon" id="toastIcon">✓</span><span id="toastMsg"></span></div>
 
 <footer>
@@ -961,7 +1100,7 @@
 
 <script>
   const $ = (sel) => document.querySelector(sel);
-  const editDlg = $('#editDlg'), confirmDlg = $('#confirmDlg'), detailDlg = $('#detailDlg'), qrDlg = $('#qrDlg');
+  const editDlg = $('#editDlg'), confirmDlg = $('#confirmDlg'), detailDlg = $('#detailDlg'), qrDlg = $('#qrDlg'), cmpDlg = $('#cmpDlg');
   let toastTimer;
   function showToast(message, isError = false, icon) {
     const el = $('#toast');
@@ -1306,6 +1445,10 @@
     const key = requireKey(); if (!key) return;
     await downloadFile('/api/links/export', 'shortly-links.csv', key);
   }
+  async function exportTagsCsv() {
+    const key = requireKey(); if (!key) return;
+    await downloadFile('/api/stats/tags/export', 'shortly-tags.csv', key);
+  }
   async function downloadFile(url, filename, key) {
     try {
       const res = await fetch(url, { headers: { 'X-API-Key': key } });
@@ -1377,11 +1520,109 @@
   }
   startActivityPolling();
 
+  /* ---- compare dialog ---- */
+  function cmpSpark(points, max, w, h) {
+    const pad = 3;
+    const n = points.length;
+    const step = n > 1 ? (w - 2 * pad) / (n - 1) : 0;
+    const xy = points.map((v, i) => {
+      const x = pad + i * step;
+      const y = h - pad - (max ? (v / max) * (h - 2 * pad) : 0);
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
+    const area = pad + ',' + (h - pad) + ' ' + xy + ' ' + (w - pad) + ',' + (h - pad);
+    return '<svg class="cmp-line" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" role="img" aria-label="daily clicks trend">'
+      + '<polygon class="cmp-area" points="' + area + '"></polygon>'
+      + '<polyline class="cmp-stroke" points="' + xy + '"></polyline></svg>';
+  }
+  function renderCompare(data) {
+    const box = $('#cmpResult');
+    const [a, b] = data.items;
+    const colors = ['var(--accent)', '#a78bfa'];
+    const maxPoint = Math.max.apply(null, a.points.concat(b.points).concat([1]));
+    const cards = [a, b].map((item, idx) => {
+      const windowTotal = item.points.reduce((x, y) => x + y, 0);
+      return '<div class="cmp-card' + (item.total_clicks === Math.max(a.total_clicks, b.total_clicks) && a.total_clicks !== b.total_clicks ? ' winner' : '') + '" style="--cmp-color:' + colors[idx] + '">'
+        + (item.total_clicks === Math.max(a.total_clicks, b.total_clicks) && a.total_clicks !== b.total_clicks ? '<span class="cmp-badge">leads</span>' : '')
+        + '<a class="cmp-code" href="/?code=' + encodeURIComponent(item.code) + '">/' + escapeHtml(item.code) + '</a>'
+        + cmpSpark(item.points, maxPoint, 220, 64)
+        + '<div class="cmp-stats">'
+        + '<span class="cmp-stat"><span class="k">total</span><span class="v">' + item.total_clicks + '</span></span>'
+        + '<span class="cmp-stat"><span class="k">unique</span><span class="v">' + item.unique_clicks + '</span></span>'
+        + '<span class="cmp-stat"><span class="k">' + data.window_days + 'd</span><span class="v">' + windowTotal + '</span></span>'
+        + '</div></div>';
+    }).join('');
+    let verdict;
+    if (a.total_clicks === b.total_clicks) verdict = 'Dead heat — both links have <strong>' + a.total_clicks + '</strong> total clicks.';
+    else {
+      const win = a.total_clicks > b.total_clicks ? a : b;
+      const lose = a.total_clicks > b.total_clicks ? b : a;
+      const pct = lose.total_clicks ? Math.round((win.total_clicks - lose.total_clicks) * 100 / lose.total_clicks) : 100;
+      verdict = '/<strong>' + escapeHtml(win.code) + '</strong> leads by ' + (win.total_clicks - lose.total_clicks) + ' clicks (' + pct + '% more).';
+    }
+    box.innerHTML = '<div class="cmp-cards">' + cards + '</div><p class="cmp-verdict">' + verdict + '</p>';
+  }
+  async function runCompare() {
+    const key = requireKey(); if (!key) return;
+    const a = $('#cmpA').value, b = $('#cmpB').value;
+    if (!a || !b) { showToast('Pick two links first', true); return; }
+    if (a === b) { showToast('Pick two different links', true); return; }
+    const days = $('#cmpDays').value;
+    const btn = $('#cmpRunBtn'); btn.disabled = true; btn.textContent = 'Working…';
+    $('#cmpResult').innerHTML = '<p class="note">Loading…</p>';
+    try {
+      const res = await fetch('/api/stats/compare?codes=' + encodeURIComponent(a) + ',' + encodeURIComponent(b) + '&days=' + days, { headers: { 'X-API-Key': key } });
+      const body = await res.json();
+      if (res.ok) renderCompare(body);
+      else $('#cmpResult').innerHTML = '<p class="note">Compare failed: ' + escapeHtml((body.error && body.error.message) || res.status) + '</p>';
+    } catch { $('#cmpResult').innerHTML = '<p class="note">Network error.</p>'; }
+    finally { btn.disabled = false; btn.textContent = 'Compare'; }
+  }
+
+  /* ---- tag manager (admin) ---- */
+  async function tagRename() {
+    const key = requireKey(); if (!key) return;
+    const from = $('#tagmgrSelect').value;
+    const to = $('#tagmgrNew').value.trim();
+    if (!to) { showToast('Enter the new tag name', true); return; }
+    const hint = $('#tagmgrHint');
+    try {
+      const res = await fetch('/api/tags/rename', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ from, to }) });
+      const body = await res.json();
+      if (res.ok) {
+        const merged = body.links_merged ? ' · ' + body.links_merged + ' merged' : '';
+        hint.textContent = 'Renamed #' + from + ' → #' + body.tag + ' (' + body.links_updated + ' updated' + merged + ')';
+        showToast('Tag renamed to #' + body.tag, false, '✏️');
+        setTimeout(() => location.reload(), 1200);
+      } else showToast((body.error && body.error.message) || ('Failed: ' + res.status), true);
+    } catch { showToast('Network error', true); }
+  }
+  async function tagDelete() {
+    const key = requireKey(); if (!key) return;
+    const tag = $('#tagmgrSelect').value;
+    if (!window.confirm('Strip #' + tag + ' from every link? (Links are kept.)')) return;
+    const hint = $('#tagmgrHint');
+    try {
+      const res = await fetch('/api/tags/' + encodeURIComponent(tag), { method: 'DELETE', headers: { 'X-API-Key': key } });
+      const body = await res.json();
+      if (res.ok) {
+        hint.textContent = 'Removed #' + tag + ' from ' + body.links_removed + ' link' + (body.links_removed === 1 ? '' : 's');
+        showToast('Tag #' + tag + ' deleted', false, '🗑️');
+        setTimeout(() => location.reload(), 1200);
+      } else showToast((body.error && body.error.message) || ('Failed: ' + res.status), true);
+    } catch { showToast('Network error', true); }
+  }
+
   $('#createBtn') && $('#createBtn').addEventListener('click', createLink);
   $('#bulkBtn') && $('#bulkBtn').addEventListener('click', bulkCreate);
   $('#editSaveBtn') && $('#editSaveBtn').addEventListener('click', saveEdit);
   $('#detailExportBtn') && $('#detailExportBtn').addEventListener('click', exportClicksCsv);
   $('#exportLinksBtn') && $('#exportLinksBtn').addEventListener('click', exportLinksCsv);
+  $('#exportTagsBtn') && $('#exportTagsBtn').addEventListener('click', exportTagsCsv);
+  $('#compareBtn') && $('#compareBtn').addEventListener('click', () => cmpDlg.showModal());
+  $('#cmpRunBtn') && $('#cmpRunBtn').addEventListener('click', runCompare);
+  $('#tagmgrRenameBtn') && $('#tagmgrRenameBtn').addEventListener('click', tagRename);
+  $('#tagmgrDeleteBtn') && $('#tagmgrDeleteBtn').addEventListener('click', tagDelete);
   $('#adminKey') && $('#adminKey').addEventListener('change', (e) => {
     if (e.target.value.trim()) { sessionStorage.setItem('shortlyKey', e.target.value.trim()); refreshAdminState(); showToast('Admin unlocked for this browser session'); pollActivity(); }
   });

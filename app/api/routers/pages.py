@@ -29,6 +29,7 @@ from app.services.stats_service import (
     get_device_breakdown_global,
     get_recent_clicks,
     get_recent_clicks_global,
+    get_tag_rollup,
     get_top_referrers,
 )
 
@@ -51,6 +52,8 @@ PER_PAGE_CHOICES = (10, 25, 50)
 TOP_LINKS_POOL = 200  # window scanned for the "Top links" panel
 DOW_LABELS = ("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
 HEATMAP_DAYS = 30  # click-hour heatmap window (dashboard + public stats page)
+TAG_PANEL_DAYS = 30  # tag-performance rollup window (dashboard panel)
+COMPARE_CODES_POOL = 200  # codes offered in the compare dialog selects
 
 
 def _fmt_abs(dt: datetime | None) -> str:
@@ -312,6 +315,10 @@ async def dashboard(
         "tag_choices": [],
         "active_tag": active_tag or "",
         "heatmap_days": HEATMAP_DAYS,
+        "tag_days": TAG_PANEL_DAYS,
+        "tag_rollup": [],
+        "tag_rollup_total": 0,
+        "compare_codes": [],
     }
     try:
         link_filter = select(Link)
@@ -381,6 +388,33 @@ async def dashboard(
             await db.execute(select(LinkTag.tag).distinct().order_by(LinkTag.tag))
         ).scalars().all()
         context["tag_choices"] = list(tag_rows)
+
+        # Tag-performance panel + compare-dialog code options.
+        rollup_raw = await get_tag_rollup(db, None, days=TAG_PANEL_DAYS)
+        rollup_total = sum(int(item["clicks"]) for item in rollup_raw)
+        context["tag_rollup"] = [
+            {
+                "tag": str(item["tag"]),
+                "hue": tag_hue(str(item["tag"])),
+                "links": int(item["links"]),
+                "clicks": int(item["clicks"]),
+                "unique": int(item["unique_visitors"]),
+                "pct": round(int(item["clicks"]) * 100 / rollup_total)
+                if rollup_total
+                else 0,
+            }
+            for item in rollup_raw
+        ]
+        context["tag_rollup_total"] = rollup_total
+        context["compare_codes"] = list(
+            (
+                await db.execute(
+                    select(Link.code)
+                    .order_by(Link.created_at.desc(), Link.id.desc())
+                    .limit(COMPARE_CODES_POOL)
+                )
+            ).scalars().all()
+        )
 
         top_pool, _ = await _links_with_counts(
             db, base_url, limit=TOP_LINKS_POOL, with_sparks=False

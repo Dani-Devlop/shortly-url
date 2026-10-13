@@ -259,3 +259,84 @@ async def test_dashboard_tag_chips_render_and_filter(client):
     empty = await client.get("/", params={"tag": "no-such-tag"})
     assert empty.status_code == 200
     assert "No links yet" in empty.text      # empty state for zero matches
+
+
+async def test_dashboard_v9_tag_performance_panel(client):
+    """Round-9: tag rollup panel renders ranked bars from real click data."""
+    a = await shorten(client, url="https://example.com/roll-a", tags=["docs"])
+    b = await shorten(client, url="https://example.com/roll-b", tags=["docs", "news"])
+    await client.get(f"/{a['code']}")
+    await client.get(f"/{b['code']}")
+    await client.get(f"/{b['code']}")
+
+    page = await client.get("/")
+    assert page.status_code == 200
+    body = page.text
+    assert "Tag performance" in body
+    assert "tagperf-row" in body
+    assert "tagperf-bar" in body
+    assert "#docs" in body and "#news" in body
+    # docs: 3 clicks (2 links) ranks above news: 2 clicks (1 link)
+    docs_pos = body.find("tagperf-row")
+    news_pos = body.find("#news")
+    assert 0 < docs_pos < news_pos
+    assert "unique visitor" in body  # meta line renders
+    # share pct: docs = 3/5 → 60%
+    assert "60% of window" in body
+
+
+async def test_dashboard_v9_tag_panel_empty_state(client):
+    response = await client.get("/")
+    assert response.status_code == 200
+    assert "No tags yet" in response.text
+
+
+async def test_dashboard_v9_compare_dialog_and_button(client):
+    await shorten(client, url="https://example.com/cmp-src-a", custom_code="cmp9a")
+    await shorten(client, url="https://example.com/cmp-src-b", custom_code="cmp9b")
+    page = await client.get("/")
+    assert page.status_code == 200
+    body = page.text
+    assert 'id="cmpDlg"' in body
+    assert 'id="cmpA"' in body and 'id="cmpB"' in body
+    assert 'id="cmpRunBtn"' in body
+    assert "renderCompare" in body and "cmpSpark" in body  # JS wiring
+    assert "leads" in body or "Dead heat" in body          # verdict branches present
+    # dialog selects are server-populated with the owner's codes
+    assert '<option value="cmp9a"' in body
+    assert '<option value="cmp9b"' in body
+    # toolbar button enabled with 2+ codes
+    assert 'id="compareBtn"' in body
+
+
+async def test_dashboard_v9_compare_button_disabled_with_fewer_than_two(client):
+    await shorten(client, url="https://example.com/lonely")
+    page = await client.get("/")
+    assert page.status_code == 200
+    assert "disabled" in page.text.split('id="compareBtn"')[1].split(">")[0]
+
+
+async def test_dashboard_v9_tag_manager_in_admin(client):
+    await shorten(client, url="https://example.com/mgr", tags=["manage-me"])
+    page = await client.get("/")
+    assert page.status_code == 200
+    body = page.text
+    assert "Tag manager" in body
+    assert 'id="tagmgrSelect"' in body
+    assert '<option value="manage-me">' in body
+    assert 'id="tagmgrRenameBtn"' in body
+    assert 'id="tagmgrDeleteBtn"' in body
+    assert "tagRename" in body and "tagDelete" in body  # JS wiring
+    assert "/api/tags/rename" in body
+
+
+async def test_dashboard_v9_tags_csv_button_and_api_rows(client):
+    await shorten(client, url="https://example.com/api-rows")
+    page = await client.get("/")
+    assert page.status_code == 200
+    body = page.text
+    assert 'id="exportTagsBtn"' in body
+    assert "exportTagsCsv" in body
+    assert "/api/stats/tags?days" in body       # new API reference rows
+    assert "/api/stats/compare?codes=a,b" in body
+    assert "/api/tags/{tag}" in body
