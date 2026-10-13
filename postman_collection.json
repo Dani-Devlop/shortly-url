@@ -51,7 +51,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"url\": \"https://example.com/some/very/long/path\",\n  \"custom_code\": null,\n  \"utm_template\": \"utm_source=newsletter&utm_campaign=launch\"\n}"
+          "raw": "{\n  \"url\": \"https://example.com/some/very/long/path\",\n  \"custom_code\": null,\n  \"utm_template\": \"utm_source=newsletter&utm_campaign=launch\",\n  \"tags\": [\"docs\", \"launch\"]\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/shorten",
@@ -63,7 +63,7 @@
             "shorten"
           ]
         },
-        "description": "Create a short link. Duplicate URLs from the same owner return the existing link. Optional `custom_code` (4–16 chars, letters/digits/-/_) and optional `utm_template` (default query params appended on every redirect; explicit short-URL params and destination params take precedence). With Redis enabled the response carries X-RateLimit-* headers; exceeding the budget answers 429 with Retry-After."
+        "description": "Create a short link. Duplicate URLs from the same owner return the existing link. Optional `custom_code` (4–16 chars, letters/digits/-/_), optional `utm_template` (default query params appended on every redirect; explicit short-URL params and destination params take precedence), and optional `tags` (max 6, normalised: trimmed/lowercased, spaces → '-', 2–24 chars). With Redis enabled the response carries X-RateLimit-* headers; exceeding the budget answers 429 with Retry-After."
       }
     },
     {
@@ -430,6 +430,59 @@
       ]
     },
     {
+      "name": "Stats — Click-Hour Heatmap",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/stats/:code/hours?days=30",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "stats",
+            ":code",
+            "hours"
+          ],
+          "variable": [
+            {
+              "key": "code",
+              "value": "{{code}}"
+            }
+          ],
+          "query": [
+            {
+              "key": "days",
+              "value": "30",
+              "description": "Rolling window 1–90 days"
+            }
+          ]
+        },
+        "description": "Zero-filled 7×24 heatmap (weekday × hour, UTC) over a rolling window. Returns {code, window_days, total, peak, cells[168]} — cells ordered Sunday 00:00 first. New in v1.7.0."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('168 cells zero-filled grid', () => pm.expect(body.cells).to.have.lengthOf(168));",
+              "pm.test('total equals sum of cells', () => pm.expect(body.total).to.eql(body.cells.reduce((a, c) => a + c.clicks, 0)));",
+              "pm.collectionVariables.set('code', body.code);"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "Export — Clicks CSV",
       "event": [
         {
@@ -554,10 +607,16 @@
               "key": "offset",
               "value": "0",
               "description": "0-based"
+            },
+            {
+              "key": "tag",
+              "value": "docs",
+              "disabled": true,
+              "description": "Only return links carrying this tag (case-insensitive)"
             }
           ]
         },
-        "description": "Paginated list of the authenticated user's links.\n\nReturns `{items, total, limit, offset}` — `total` counts all the user's links."
+        "description": "Paginated list of the user's links — {items, total, limit, offset}. Optional `?tag=` filters by tag. New in v1.7.0."
       }
     },
     {
@@ -625,7 +684,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"url\": \"https://example.com/updated/destination\",\n  \"expires_at\": null,\n  \"utm_template\": \"utm_source=banner&utm_medium=cpc\"\n}"
+          "raw": "{\n  \"url\": \"https://example.com/updated/destination\",\n  \"expires_at\": null,\n  \"utm_template\": \"utm_source=banner&utm_medium=cpc\",\n  \"tags\": [\"docs\", \"updated\"]\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/links/{{code}}",
@@ -638,7 +697,7 @@
             "{{code}}"
           ]
         },
-        "description": "Point the short code at a new destination and/or set `expires_at` (ISO 8601; null clears) and/or set `utm_template` (null clears the campaign template). The cached redirect mapping is invalidated automatically."
+        "description": "Point the short code at a new destination and/or set `expires_at` (ISO 8601; null clears) and/or set `utm_template` (null clears the campaign template) and/or replace the tag set (`tags: []` clears all; omit the field to leave tags untouched). The cached redirect mapping is invalidated automatically."
       }
     },
     {
