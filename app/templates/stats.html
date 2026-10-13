@@ -143,6 +143,36 @@
     .ref-chip .ref-bar { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent-strong), var(--accent)); min-width: 3px; }
     .ref-chip .ref-count { color: var(--muted); font-variant-numeric: tabular-nums; }
 
+    /* tag chips (hero) */
+    .tag-chip {
+      display: inline-block; margin: 0 .18rem 0 0; font-size: .68rem; font-weight: 700;
+      padding: .12rem .55rem; border-radius: 999px; letter-spacing: .02em; text-decoration: none;
+      background: hsl(var(--tag-h, 152) 55% 17%); color: hsl(var(--tag-h, 152) 70% 64%);
+      border: 1px solid hsl(var(--tag-h, 152) 50% 32% / .55);
+    }
+    @media (prefers-color-scheme: light) {
+      .tag-chip {
+        background: hsl(var(--tag-h, 152) 75% 92%); color: hsl(var(--tag-h, 152) 60% 28%);
+        border-color: hsl(var(--tag-h, 152) 55% 72%);
+      }
+    }
+
+    /* click-hour heatmap (server-rendered) */
+    .heatmap { display: grid; grid-template-columns: 34px repeat(24, 1fr); gap: 2px; align-items: center; }
+    .heatmap .hm-day { font-size: .6rem; color: var(--muted); font-weight: 700; text-align: right; padding-right: 2px; }
+    .heatmap .hm-hour { font-size: .56rem; color: var(--muted); text-align: center; }
+    .heatmap .hm-cell {
+      width: 100%; aspect-ratio: 1 / 1; border-radius: 3px; min-width: 0;
+      background: var(--accent); opacity: 0; transition: transform .1s ease, filter .1s ease;
+    }
+    .heatmap .hm-cell.hm-zero { background: var(--border); opacity: 1; }
+    .heatmap .hm-cell:hover { transform: scale(1.4); filter: brightness(1.3); }
+    .hm-legend { display: flex; align-items: center; gap: .35rem; font-size: .68rem; color: var(--muted); margin-top: .5rem; flex-wrap: wrap; }
+    .hm-legend .swatch { width: 11px; height: 11px; border-radius: 3px; background: var(--accent); display: inline-block; }
+    .hm-legend .swatch.zero { background: var(--border); }
+    .hm-scroller { overflow-x: auto; padding-bottom: 2px; }
+    .hm-scroller .heatmap { min-width: 430px; }
+
     .act-list { list-style: none; }
     .act-row {
       display: flex; align-items: center; gap: .5rem; padding: .45rem .15rem;
@@ -207,6 +237,7 @@
             ⏳ {{ link.expiry.label }}</span>
         {% endif %}
         {% if link.utm %}<span class="meta-chip campaign" title="{{ link.utm }}">📣 <span class="k">{{ link.utm }}</span></span>{% endif %}
+        {% if link.tags %}{% for t in link.tags %}<span class="tag-chip" style="--tag-h: {{ t.hue }}" title="Organisation tag">#{{ t.tag }}</span>{% endfor %}{% endif %}
         <span class="meta-chip" title="Shareable stats URL — copy and send this page's address">📊 {{ stats_url }}</span>
       </div>
     </section>
@@ -229,6 +260,31 @@
         <div class="chart-axis"><span>{{ bars[0].date }}</span><span>today</span></div>
       {% else %}
         <p class="note">No clicks recorded yet.</p>
+      {% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>🗓 When · last {{ heatmap_days }} days <span class="hint">UTC — hover a cell for detail</span></h2>
+      {% if heatmap and heatmap.peak > 0 %}
+        <div class="hm-scroller">
+          <div class="heatmap" role="img" aria-label="Clicks by weekday and hour of day, last {{ heatmap_days }} days">
+            <span class="hm-day"></span>
+            {% for h in range(24) %}<span class="hm-hour">{{ h if h % 6 == 0 else '·' }}</span>{% endfor %}
+            {% for row in heatmap.rows %}
+              <span class="hm-day">{{ row.label }}</span>
+              {% for c in row.cells %}
+                <span class="hm-cell{{ ' hm-zero' if c.clicks == 0 }}" style="opacity: {{ ((0.3 + 0.7 * c.pct / 100) * 100) | round(0) / 100 if c.clicks else 0 }}" title="{{ c.label }}"></span>
+              {% endfor %}
+            {% endfor %}
+          </div>
+        </div>
+        <div class="hm-legend">
+          <span class="swatch zero"></span> none
+          <span class="swatch" style="opacity:.4"></span><span class="swatch" style="opacity:.7"></span><span class="swatch"></span> busy
+          <span style="margin-left:auto">{{ heatmap.total }} clicks in window · peak {{ heatmap.peak }}</span>
+        </div>
+      {% else %}
+        <p class="note">No clicks in the last {{ heatmap_days }} days yet.</p>
       {% endif %}
     </section>
 

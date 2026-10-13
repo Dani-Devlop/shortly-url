@@ -11,7 +11,7 @@ from app.core.config import get_settings
 from app.core.exceptions import AppError, ConflictError
 from app.core.redis import cache_delete, cache_set
 from app.core.security import generate_short_code
-from app.models import Link
+from app.models import Link, LinkTag
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -81,8 +81,10 @@ async def create_link(
     custom_code: str | None = None,
     expires_at: datetime | None = None,
     utm_template: str | None = None,
+    tags: list[str] | None = None,
 ) -> Link:
-    """Create a link. Duplicate URLs from the same owner return the existing link."""
+    """Create a link. Duplicate URLs from the same owner return the existing link
+    unchanged (already-set tags on the existing link are kept as-is)."""
     validate_target_url(original_url)
 
     existing = await db.scalar(
@@ -107,6 +109,8 @@ async def create_link(
         expires_at=expires_at,
         utm_template=utm_template,
     )
+    if tags:
+        link.tag_rows = [LinkTag(tag=tag) for tag in sorted(set(tags))]
     db.add(link)
     await db.commit()
     await db.refresh(link)
@@ -136,13 +140,14 @@ async def update_link(
     new_url: str | None = None,
     expires_at: datetime | None | LinkExpiryUnset = _UNSET,
     utm_template: str | None | LinkExpiryUnset = _UNSET,
+    tags: list[str] | LinkExpiryUnset = _UNSET,
 ) -> Link:
-    """Update destination/expiry/UTM template, then invalidate the link's cache.
+    """Update destination/expiry/UTM template/tags, then invalidate the link's cache.
 
-    ``expires_at`` and ``utm_template`` accept:
+    ``expires_at``, ``utm_template`` and ``tags`` accept:
     - ``_UNSET`` (default): leave the field untouched
-    - ``None``: clear the field
-    - a datetime / string: set the field
+    - ``None``: clear the field (tags → empty set)
+    - a datetime / string / list: set the field (tags replaces the whole set)
     """
     changed = False
     if new_url is not None:
@@ -157,6 +162,12 @@ async def update_link(
     if not isinstance(utm_template, LinkExpiryUnset):
         if link.utm_template != utm_template:
             link.utm_template = utm_template
+            changed = True
+    if not isinstance(tags, LinkExpiryUnset):
+        new_set = sorted(set(tags or []))
+        old_set = sorted(row.tag for row in link.tag_rows)
+        if new_set != old_set:
+            link.tag_rows = [LinkTag(tag=tag) for tag in new_set]
             changed = True
     if changed:
         db.add(link)

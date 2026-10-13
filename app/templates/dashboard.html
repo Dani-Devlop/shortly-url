@@ -217,6 +217,40 @@
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     }
     [data-theme="light"] .utm-chip { color: #7c3aed; }
+    .tag-chip {
+      display: inline-block; margin: .2rem .18rem 0 0; font-size: .62rem; font-weight: 700;
+      padding: .1rem .5rem; border-radius: 999px; letter-spacing: .02em; text-decoration: none;
+      background: hsl(var(--tag-h, 152) 55% 17%);
+      color: hsl(var(--tag-h, 152) 70% 64%);
+      border: 1px solid hsl(var(--tag-h, 152) 50% 32% / .55);
+      transition: transform .12s ease, filter .12s ease;
+    }
+    .tag-chip:hover { transform: translateY(-1px); filter: brightness(1.3); text-decoration: none; }
+    [data-theme="light"] .tag-chip {
+      background: hsl(var(--tag-h, 152) 75% 92%);
+      color: hsl(var(--tag-h, 152) 60% 28%);
+      border-color: hsl(var(--tag-h, 152) 55% 72%);
+    }
+    .tag-chips { display: block; max-width: 150px; }
+    /* click-hour heatmap */
+    .heatmap {
+      display: grid; grid-template-columns: 34px repeat(24, 1fr);
+      gap: 2px; align-items: center;
+    }
+    .heatmap .hm-day { font-size: .6rem; color: var(--muted); font-weight: 700; text-align: right; padding-right: 2px; }
+    .heatmap .hm-hour { font-size: .56rem; color: var(--muted); text-align: center; }
+    .heatmap .hm-cell {
+      width: 100%; aspect-ratio: 1 / 1; border-radius: 3px; min-width: 0;
+      background: var(--accent); opacity: 0;
+      transition: transform .1s ease, box-shadow .1s ease;
+    }
+    .heatmap .hm-cell.hm-zero { background: var(--border); opacity: 1; }
+    .heatmap .hm-cell:hover { transform: scale(1.4); box-shadow: 0 0 0 1.5px var(--accent-strong); position: relative; z-index: 2; }
+    .hm-legend { display: flex; align-items: center; gap: .35rem; font-size: .66rem; color: var(--muted); margin-top: .45rem; }
+    .hm-legend .swatch { width: 11px; height: 11px; border-radius: 3px; background: var(--accent); display: inline-block; }
+    .hm-legend .swatch.zero { background: var(--border); }
+    .hm-scroller { overflow-x: auto; padding-bottom: 2px; }
+    .hm-scroller .heatmap { min-width: 420px; }
     .actions { display: flex; gap: .3rem; }
     .icon-btn {
       display: inline-flex; align-items: center; justify-content: center;
@@ -654,6 +688,11 @@
             <input id="newUrl" placeholder="https://example.com/destination" style="flex:1; min-width:220px">
             <button type="button" id="createBtn">⚡ Shorten</button>
           </div>
+          <div class="row" style="margin-top:.45rem">
+            <input id="newAlias" placeholder="custom alias (optional) — my-link" autocomplete="off" spellcheck="false"
+                   style="flex:1; min-width:150px; font-family:ui-monospace, SFMono-Regular, Menlo, monospace">
+            <input id="newTags" placeholder="tags (optional) — docs, launch" autocomplete="off" spellcheck="false" style="flex:1; min-width:150px">
+          </div>
           <input id="newUtm" placeholder="UTM template (optional) — utm_source=newsletter&utm_campaign=launch" autocomplete="off" spellcheck="false" style="margin-top:.45rem">
         </div>
         <div class="field">
@@ -676,7 +715,10 @@
 
     <section>
       <div class="toolbar">
-        <h2 style="margin:0">🔗 Recent links <span class="hint">hover a row for actions</span></h2>
+        <h2 style="margin:0">🔗 Recent links
+          {% if active_tag %}<span class="hint">filtered by <a class="tag-chip" style="--tag-h: 152" href="/">#{{ active_tag }} ✕</a></span>{% endif %}
+          <span class="hint">hover a row for actions</span>
+        </h2>
         <form method="get" action="/" style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap">
           <input type="hidden" name="code" value="{{ lookup }}">
           <button type="button" id="autorefBtn" class="autoref" aria-pressed="false" title="Reload this panel every 30 seconds">
@@ -700,6 +742,16 @@
               <option value="clicks" {{ 'selected' if sort == 'clicks' }}>Most clicked</option>
             </select>
           </label>
+          {% if tag_choices %}
+            <label>Tag
+              <select name="tag" onchange="this.form.submit()" aria-label="Filter by tag">
+                <option value="">All tags</option>
+                {% for t in tag_choices %}
+                  <option value="{{ t }}" {{ 'selected' if active_tag == t }}>#{{ t }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          {% endif %}
         </form>
       </div>
       <div class="table-wrap" role="region" aria-label="Links table">
@@ -709,10 +761,15 @@
           </thead>
           <tbody>
             {% for l in links %}
-              <tr data-code="{{ l.code }}" data-url="{{ l.original_url|lower }}" style="--i: {{ loop.index0 }}">
+              <tr data-code="{{ l.code }}" data-url="{{ l.original_url|lower }}" data-tags="{{ l.tags | map(attribute='tag') | join(' ') }}" style="--i: {{ loop.index0 }}">
                 <td>
                   <a href="/{{ l.code }}" target="_blank" rel="noopener noreferrer">{{ l.code }}</a>
                   {% if l.utm %}<span class="utm-chip" title="UTM template: {{ l.utm }} — default params appended on redirect">📣 {{ l.utm }}</span>{% endif %}
+                  {% if l.tags %}<span class="tag-chips">
+                    {%- for t in l.tags -%}
+                      <a class="tag-chip" style="--tag-h: {{ t.hue }}" href="/?tag={{ t.tag }}" title="Show links tagged #{{ t.tag }}">#{{ t.tag }}</a>
+                    {%- endfor -%}
+                  </span>{% endif %}
                 </td>
                 <td class="url-cell" title="{{ l.original_url }}">
                   <a href="{{ l.original_url }}" target="_blank" rel="noopener noreferrer">{{ l.original_url_display }}</a>
@@ -766,7 +823,7 @@
         <nav class="pager" aria-label="Table pagination">
           <span class="range">Showing {{ pagination.start }}–{{ pagination.end }} of {{ pagination.total }} links</span>
           <div class="pages">
-            {% set base = '/?sort=' ~ sort ~ '&per_page=' ~ per_page ~ (('&code=' ~ lookup) if lookup else '') %}
+            {% set base = '/?sort=' ~ sort ~ '&per_page=' ~ per_page ~ (('&code=' ~ lookup) if lookup else '') ~ (('&tag=' ~ active_tag) if active_tag else '') %}
             {% if pagination.has_prev %}
               <a class="page-btn" href="{{ base }}&page={{ pagination.page - 1 }}" rel="prev">← Prev</a>
             {% else %}
@@ -810,6 +867,10 @@
       <label class="checkbox-row"><input id="editNoExpiry" type="checkbox"> No expiry (clears any set expiry)</label>
     </div>
     <div class="field">
+      <span for="editTags">Tags (comma-separated — replaces the whole set)</span>
+      <input id="editTags" placeholder="docs, launch" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="field">
       <span for="editUtm">UTM template (optional)</span>
       <input id="editUtm" placeholder="utm_source=newsletter&utm_campaign=launch" autocomplete="off" spellcheck="false">
       <span class="note">Default campaign params appended on every redirect — explicit short-URL params win.</span>
@@ -842,6 +903,11 @@
     <div>
       <div class="ref-title">Clicks · last 14 days</div>
       <div class="mini-chart" id="detailChart" role="img" aria-label="Daily clicks for the last 14 days"></div>
+    </div>
+    <div>
+      <div class="ref-title">When · last {{ heatmap_days }} days <span class="hint">UTC</span></div>
+      <div class="hm-scroller"><div class="heatmap" id="detailHeatmap" role="img" aria-label="Clicks by weekday and hour of day"></div></div>
+      <div class="hm-legend" id="hmLegend"></div>
     </div>
     <div>
       <div class="ref-title">Traffic sources · all time</div>
@@ -964,17 +1030,24 @@
   }
 
   /* ---- create ---- */
+  function parseTags(raw) {
+    return raw.split(',').map((s) => s.trim()).filter(Boolean);
+  }
   async function createLink() {
     const key = requireKey(); if (!key) return;
     const url = $('#newUrl').value.trim();
     if (!url) { showToast('Enter a destination URL', true); return; }
     const utm = $('#newUtm') ? $('#newUtm').value.trim() : '';
+    const alias = $('#newAlias') ? $('#newAlias').value.trim() : '';
+    const tags = $('#newTags') ? parseTags($('#newTags').value) : [];
     try {
       const body = { url };
       if (utm) body.utm_template = utm;
+      if (alias) body.custom_code = alias;
+      if (tags.length) body.tags = tags;
       const res = await fetch('/api/shorten', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
       const data = await res.json();
-      if (res.status === 201) { showToast('Created ' + data.code, false, '⚡'); $('#newUrl').value = ''; if ($('#newUtm')) $('#newUtm').value = ''; setTimeout(() => location.reload(), 900); }
+      if (res.status === 201) { showToast('Created ' + data.code, false, '⚡'); $('#newUrl').value = ''; if ($('#newUtm')) $('#newUtm').value = ''; if ($('#newAlias')) $('#newAlias').value = ''; if ($('#newTags')) $('#newTags').value = ''; setTimeout(() => location.reload(), 900); }
       else showToast((data.error && data.error.message) || ('Failed: ' + res.status), true);
     } catch { showToast('Network error', true); }
   }
@@ -1014,6 +1087,7 @@
     $('#editExpiry').value = '';
     $('#editNoExpiry').checked = false;
     $('#editUtm').value = '';
+    $('#editTags').value = btn ? ((btn.closest('tr')?.dataset.tags || '')) : '';
     // Pre-fill current values from the API (best effort).
     fetch('/api/links/' + encodeURIComponent(code), { headers: { 'X-API-Key': key } })
       .then((r) => (r.ok ? r.json() : null))
@@ -1022,6 +1096,7 @@
         if (!$('#editUrl').value) $('#editUrl').value = data.original_url || '';
         if (data.expires_at) $('#editExpiry').value = toLocalInput(data.expires_at);
         if (data.utm_template) $('#editUtm').value = data.utm_template;
+        if (Array.isArray(data.tags)) $('#editTags').value = data.tags.join(', ');
       });
     editDlg.showModal();
   }
@@ -1030,7 +1105,7 @@
     const code = $('#editCode').value.trim();
     const url = $('#editUrl').value.trim();
     if (!url) { showToast('Destination URL is required', true); return; }
-    const payload = { url, utm_template: $('#editUtm').value.trim() || null };
+    const payload = { url, utm_template: $('#editUtm').value.trim() || null, tags: parseTags($('#editTags').value) };
     if ($('#editNoExpiry').checked) payload.expires_at = null;
     else if ($('#editExpiry').value) payload.expires_at = new Date($('#editExpiry').value).toISOString();
     try {
@@ -1066,7 +1141,7 @@
       const q = input.value.trim().toLowerCase();
       let visible = 0;
       rows.forEach((row) => {
-        const hay = row.dataset.code + ' ' + (row.dataset.url || '');
+        const hay = row.dataset.code + ' ' + (row.dataset.url || '') + ' ' + (row.dataset.tags || '');
         const hit = !q || hay.includes(q);
         row.classList.toggle('row-hidden', !hit);
         if (hit) visible += 1;
@@ -1146,6 +1221,48 @@
 
   /* ---- detail dialog ---- */
   let detailCode = '';
+  const DOW_LABELS_JS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  async function loadHeatmap(code, key) {
+    const grid = $('#detailHeatmap');
+    if (!grid) return;
+    grid.innerHTML = '';
+    try {
+      const res = await fetch('/api/stats/' + encodeURIComponent(code) + '/hours?days=30', { headers: { 'X-API-Key': key } });
+      if (!res.ok) { grid.innerHTML = '<span class="note">Heatmap unavailable.</span>'; return; }
+      const body = await res.json();
+      renderHeatmap(body.cells, body.total, body.peak);
+    } catch { grid.innerHTML = '<span class="note">Heatmap unavailable.</span>'; }
+  }
+  function renderHeatmap(cells, total, peak) {
+    const grid = $('#detailHeatmap');
+    if (!grid) return;
+    if (!cells || !cells.length) { grid.innerHTML = '<span class="note">No data yet.</span>'; return; }
+    const byCell = {};
+    cells.forEach((c) => { byCell[c.dow + ':' + c.hour] = c.clicks; });
+    let html = '';
+    // hour ruler (24 ticks, labelled at 0/6/12/18)
+    html += '<span class="hm-day"></span>';
+    for (let h = 0; h < 24; h++) {
+      html += '<span class="hm-hour">' + (h % 6 === 0 ? h : '·') + '</span>';
+    }
+    for (let d = 0; d < 7; d++) {
+      html += '<span class="hm-day">' + DOW_LABELS_JS[d] + '</span>';
+      for (let h = 0; h < 24; h++) {
+        const clicks = byCell[d + ':' + h] || 0;
+        const intensity = peak ? clicks / peak : 0;
+        const opacity = clicks ? (0.3 + 0.7 * intensity).toFixed(2) : 0;
+        const title = DOW_LABELS_JS[d] + ' ' + String(h).padStart(2, '0') + ':00 UTC · ' + clicks + ' click' + (clicks === 1 ? '' : 's');
+        html += '<span class="hm-cell' + (clicks ? '' : ' hm-zero') + '"' + (clicks ? ' style="opacity:' + opacity + '"' : '') + ' title="' + title + '"></span>';
+      }
+    }
+    grid.innerHTML = html;
+    const legend = $('#hmLegend');
+    if (legend) {
+      legend.innerHTML = '<span class="swatch zero"></span> none'
+        + '<span class="swatch" style="opacity:.4"></span><span class="swatch" style="opacity:.7"></span><span class="swatch"></span> busy'
+        + '<span style="margin-left:auto">' + total + ' clicks in window' + (peak ? ' · peak ' + peak : '') + '</span>';
+    }
+  }
   async function openDetail(code) {
     const key = requireKey(); if (!key) return;
     detailCode = code;
@@ -1153,6 +1270,7 @@
     $('#detailMeta').textContent = 'Loading…';
     $('#detailClicks').innerHTML = '<div class="empty">Loading…</div>';
     detailDlg.showModal();
+    loadHeatmap(code, key);
     try {
       const res = await fetch('/api/links/' + encodeURIComponent(code), { headers: { 'X-API-Key': key } });
       if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error((b.error && b.error.message) || res.status); }

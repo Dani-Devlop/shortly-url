@@ -200,6 +200,39 @@ async def get_device_breakdown_global(
     return items, sum(count for _, count in items)
 
 
+async def get_clicks_by_hour_for_links(
+    db: AsyncSession, link_ids: list[int], days: int = 30
+) -> dict[tuple[int, int], int]:
+    """Click counts per (day-of-week, hour-of-day) over a rolling window.
+
+    Returns ``{(dow, hour): clicks}`` for the cells that have data — callers
+    zero-fill the 7×24 grid. ``dow`` is 0=Sunday … 6=Saturday and ``hour`` is
+    0–23, both in UTC, portable across PostgreSQL (``EXTRACT``) and SQLite
+    (``strftime``).
+    """
+    if not link_ids:
+        return {}
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+    is_pg = bool(getattr(getattr(db, "bind", None), "dialect", None)) and (
+        db.bind.dialect.name == "postgresql"  # type: ignore[union-attr]
+    )
+    if is_pg:
+        dow = func.extract("dow", Click.clicked_at)  # 0=Sunday, matches SQLite %w
+        hour = func.extract("hour", Click.clicked_at)
+    else:  # SQLite / fallback
+        dow = func.strftime("%w", Click.clicked_at)
+        hour = func.strftime("%H", Click.clicked_at)
+    rows = await db.execute(
+        select(dow.label("dow"), hour.label("hour"), func.count().label("clicks"))
+        .where(Click.link_id.in_(link_ids), Click.clicked_at >= cutoff)
+        .group_by(dow, hour)
+    )
+    cells: dict[tuple[int, int], int] = {}
+    for dow_value, hour_value, clicks in rows.all():
+        cells[(int(dow_value), int(hour_value))] = int(clicks)
+    return cells
+
+
 async def get_daily_clicks_for_links(
     db: AsyncSession, link_ids: list[int], days: int = 7
 ) -> dict[int, list[int]]:

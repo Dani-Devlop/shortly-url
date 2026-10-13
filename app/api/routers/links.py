@@ -15,7 +15,7 @@ from app.core.exceptions import NotFoundError
 from app.core.rate_limit import enforce_rate_limit
 from app.core.security import hash_identifier
 from app.db.session import get_db
-from app.models import Link, User
+from app.models import Link, LinkTag, User
 from app.schemas.link import (
     BulkResultItem,
     BulkShortenOut,
@@ -62,6 +62,7 @@ def _to_out(link: Link, total_clicks: int) -> LinkOut:
         created_at=link.created_at,
         expires_at=link.expires_at,
         utm_template=link.utm_template,
+        tags=link.tags,
         total_clicks=total_clicks,
     )
 
@@ -85,6 +86,7 @@ async def shorten(
         custom_code=payload.custom_code,
         expires_at=payload.expires_at,
         utm_template=payload.utm_template,
+        tags=payload.tags,
     )
     out = _to_out(link, await get_total_clicks(db, link))
     response.headers["Location"] = out.short_url
@@ -168,7 +170,10 @@ async def export_links_csv(
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\n")
     writer.writerow(
-        ["code", "short_url", "original_url", "total_clicks", "created_at", "expires_at"]
+        [
+            "code", "short_url", "original_url", "total_clicks",
+            "created_at", "expires_at", "tags",
+        ]
     )
     for link in rows:
         writer.writerow(
@@ -179,6 +184,7 @@ async def export_links_csv(
                 counts.get(link.id, 0),
                 link.created_at.isoformat() if link.created_at else "",
                 link.expires_at.isoformat() if link.expires_at else "",
+                ";".join(link.tags),
             ]
         )
     stamp = datetime.now(UTC).strftime("%Y%m%d")
@@ -197,23 +203,32 @@ async def list_links(
     db: AsyncSession = Depends(get_db),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    tag: str | None = Query(
+        default=None,
+        max_length=32,
+        description="Only return links carrying this tag (case-insensitive).",
+    ),
 ) -> LinkPageOut:
     """Paginated list of the authenticated user's links, newest first.
 
-    Returns ``{items, total, limit, offset}`` — ``total`` counts all the
-    user's links so clients can compute page counts.
+    Returns ``{items, total, limit, offset}`` — ``total`` counts the matching
+    links so clients can compute page counts. Pass ``?tag=`` to filter.
     """
-    total = int(
-        await db.scalar(
-            select(func.count()).select_from(Link).where(Link.owner_id == user.id)
+    base = select(Link).where(Link.owner_id == user.id)
+    if tag:
+        base = base.where(
+            Link.id.in_(
+                select(LinkTag.link_id).where(
+                    LinkTag.tag == tag.strip().lower()
+                )
+            )
         )
-        or 0
+    total = int(
+        await db.scalar(select(func.count()).select_from(base.subquery())) or 0
     )
     rows = (
         await db.execute(
-            select(Link)
-            .where(Link.owner_id == user.id)
-            .order_by(Link.created_at.desc(), Link.id.desc())
+            base.order_by(Link.created_at.desc(), Link.id.desc())
             .offset(offset)
             .limit(limit)
         )
@@ -274,6 +289,7 @@ async def link_detail(
         created_at=link.created_at,
         expires_at=link.expires_at,
         utm_template=link.utm_template,
+        tags=link.tags,
         total_clicks=await get_total_clicks(db, link),
         unique_clicks=await count_unique_clicks(db, link.id),
         recent_clicks=recent,
@@ -290,10 +306,11 @@ async def update_link_fields(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> LinkOut:
-    """Update a link's destination, expiry and/or UTM template (cache is invalidated).
+    """Update a link's destination, expiry, UTM template and/or tags (cache is invalidated).
 
-    Send ``{"expires_at": null}`` to remove an expiry or ``{"utm_template": null}``
-    to clear the campaign template.
+    Send ``{"expires_at": null}`` to remove an expiry, ``{"utm_template": null}``
+    to clear the campaign template, and ``{"tags": []}`` to clear all tags
+    (``tags`` replaces the whole set whenever present).
     """
     link = await _owned_link(db, code, user)
     provided = payload.model_fields_set
@@ -302,8 +319,9 @@ async def update_link_fields(
         payload.expires_at if "expires_at" in provided else LinkExpiryUnset()
     )
     utm = payload.utm_template if "utm_template" in provided else LinkExpiryUnset()
+    tags = payload.tags if "tags" in provided else LinkExpiryUnset()
     link = await update_link(
-        db, link, new_url=new_url, expires_at=expiry, utm_template=utm
+        db, link, new_url=new_url, expires_at=expiry, utm_template=utm, tags=tags
     )
     return _to_out(link, await get_total_clicks(db, link))
 

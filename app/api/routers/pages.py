@@ -16,12 +16,14 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import __version__
+from app.core.tags import tag_hue
 from app.db.session import get_db
-from app.models import Click, Link
+from app.models import Click, Link, LinkTag
 from app.services.stats_service import (
     count_clicks,
     count_unique_clicks,
     count_unique_clicks_global,
+    get_clicks_by_hour_for_links,
     get_daily_clicks_for_links,
     get_device_breakdown,
     get_device_breakdown_global,
@@ -47,6 +49,8 @@ PUBLIC_CODE_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
 DEVICE_CLASSES = ("desktop", "mobile", "tablet", "bot", "other")
 PER_PAGE_CHOICES = (10, 25, 50)
 TOP_LINKS_POOL = 200  # window scanned for the "Top links" panel
+DOW_LABELS = ("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+HEATMAP_DAYS = 30  # click-hour heatmap window (dashboard + public stats page)
 
 
 def _fmt_abs(dt: datetime | None) -> str:
@@ -192,21 +196,49 @@ def _device_panel(
     ]
 
 
+def _tag_view(tags: list[str]) -> list[dict]:
+    """Render data for tag chips: name + deterministic hue for colouring."""
+    return [{"tag": tag, "hue": tag_hue(tag)} for tag in tags]
+
+
+def _heatmap_rows(raw: dict[tuple[int, int], int]) -> dict:
+    """Render data for the 7×24 click-hour heatmap (server-side variant)."""
+    peak = max(raw.values(), default=0)
+    rows = []
+    for dow in range(7):
+        cells = []
+        for hour in range(24):
+            clicks = raw.get((dow, hour), 0)
+            # Intensity 0–100; keep empty cells visible as a faint baseline.
+            pct = round(clicks * 100 / peak) if peak else 0
+            cells.append(
+                {
+                    "hour": hour,
+                    "clicks": clicks,
+                    "pct": pct,
+                    "label": f"{DOW_LABELS[dow]} {hour:02d}:00 UTC · {clicks} clicks",
+                }
+            )
+        rows.append({"dow": dow, "label": DOW_LABELS[dow], "cells": cells})
+    return {"rows": rows, "peak": peak, "total": sum(raw.values())}
+
+
 async def _links_with_counts(
     db: AsyncSession,
     base_url: str,
     limit: int = 50,
     offset: int = 0,
     with_sparks: bool = True,
+    tag: str | None = None,
 ) -> tuple[list[dict], int]:
-    links = (
-        await db.execute(
-            select(Link)
-            .order_by(Link.created_at.desc(), Link.id.desc())
-            .offset(offset)
-            .limit(limit)
+    stmt = select(Link).order_by(Link.created_at.desc(), Link.id.desc())
+    if tag:
+        stmt = stmt.where(
+            Link.id.in_(select(LinkTag.link_id).where(LinkTag.tag == tag))
         )
-    ).scalars().all()
+    links = (
+        (await db.execute(stmt.offset(offset).limit(limit))).scalars().all()
+    )
     counts = {}
     series = {}
     if links:
@@ -230,6 +262,7 @@ async def _links_with_counts(
             "created_rel": _fmt_rel(link.created_at),
             "expiry": _expiry_view(link.expires_at),
             "utm": link.utm_template,
+            "tags": _tag_view(link.tags),
             "sparkline": _sparkline_svg(series.get(link.id, [0] * SPARKLINE_DAYS))
             if with_sparks
             else "",
@@ -248,10 +281,12 @@ async def dashboard(
     page: int = Query(default=1, ge=1, le=1000),
     per_page: int = Query(default=25, ge=1, le=100),
     bots: bool = Query(default=True, description="Include the 'bot' device class in the Devices panel."),
+    tag: str | None = Query(default=None, max_length=32, description="Only show links carrying this tag."),
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     if per_page not in PER_PAGE_CHOICES:
         per_page = 25
+    active_tag = (tag or "").strip().lower() or None
     context: dict = {
         "version": __version__,
         "summary": {"total_links": 0, "total_clicks": 0, "clicks_7d": 0, "avg_clicks": "0"},
@@ -274,10 +309,23 @@ async def dashboard(
         "trend": None,
         "unique_visitors": 0,
         "bots": bots,
+        "tag_choices": [],
+        "active_tag": active_tag or "",
+        "heatmap_days": HEATMAP_DAYS,
     }
     try:
+        link_filter = select(Link)
+        if active_tag:
+            link_filter = link_filter.where(
+                Link.id.in_(
+                    select(LinkTag.link_id).where(LinkTag.tag == active_tag)
+                )
+            )
         total_links = int(
-            await db.scalar(select(func.count()).select_from(Link)) or 0
+            await db.scalar(
+                select(func.count()).select_from(link_filter.subquery())
+            )
+            or 0
         )
         total_clicks = int(
             await db.scalar(select(func.count()).select_from(Click)) or 0
@@ -295,14 +343,15 @@ async def dashboard(
 
         base_url = str(request.base_url).rstrip("/")
         entries, _ = await _links_with_counts(
-            db, base_url, limit=per_page, offset=offset
+            db, base_url, limit=per_page, offset=offset, tag=active_tag
         )
 
-        # Trend chip: this week vs previous week from one 14-day grouped query.
+        # Trend chip: this week vs previous week from one 14-day grouped query
+        # (scoped to the visible/filtered page of links).
         page_link_ids = list(
             (
                 await db.execute(
-                    select(Link.id)
+                    link_filter.with_only_columns(Link.id)
                     .order_by(Link.created_at.desc(), Link.id.desc())
                     .offset(offset)
                     .limit(per_page)
@@ -327,6 +376,11 @@ async def dashboard(
             "has_prev": page > 1,
             "has_next": page < total_pages,
         }
+
+        tag_rows = (
+            await db.execute(select(LinkTag.tag).distinct().order_by(LinkTag.tag))
+        ).scalars().all()
+        context["tag_choices"] = list(tag_rows)
 
         top_pool, _ = await _links_with_counts(
             db, base_url, limit=TOP_LINKS_POOL, with_sparks=False
@@ -409,6 +463,7 @@ async def public_stats_page(
         "devices_total": 0,
         "referrers": [],
         "recent": [],
+        "heatmap": None,
         "stats_url": f"{base_url}/s/{code}",
     }
     status_code = 200
@@ -430,6 +485,9 @@ async def public_stats_page(
             dev_total = sum(clicks for _, clicks in dev_items)
             refs = await get_top_referrers(db, link, limit=STATS_PAGE_REFERRERS)
             recent_rows = await get_recent_clicks(db, link, limit=STATS_PAGE_RECENT)
+            hour_raw = await get_clicks_by_hour_for_links(
+                db, [link.id], days=HEATMAP_DAYS
+            )
             context.update(
                 {
                     "link": {
@@ -440,12 +498,15 @@ async def public_stats_page(
                         "created_abs": _fmt_abs(link.created_at),
                         "expiry": _expiry_view(link.expires_at),
                         "utm": link.utm_template,
+                        "tags": _tag_view(link.tags),
                     },
                     "total_clicks": total,
                     "unique_clicks": await count_unique_clicks(db, link.id),
                     "bars": _stats_chart_bars(points),
                     "devices": _device_panel(dev_items, dev_total),
                     "devices_total": dev_total,
+                    "heatmap": _heatmap_rows(hour_raw),
+                    "heatmap_days": HEATMAP_DAYS,
                     "referrers": [
                         {
                             "source": source or "direct",

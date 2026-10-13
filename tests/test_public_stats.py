@@ -114,3 +114,43 @@ async def test_stats_page_route_does_not_shadow_redirects(client: AsyncClient):
     data = await shorten(client, url="https://example.com/no-shadow")
     response = await client.get(f"/{data['code']}")
     assert response.status_code == 302
+
+
+async def test_public_stats_page_heatmap_and_tags(client: AsyncClient, db_engine):
+    """v1.7.0: server-rendered click-hour heatmap + tag chips in the hero."""
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    factory = async_sessionmaker(bind=db_engine, expire_on_commit=False)
+    data = await shorten(
+        client, url="https://example.com/heatmap-public", tags=["Marketing", "Docs"]
+    )
+    now = datetime.now(UTC)
+    # Both clicks land in the SAME (weekday, hour) cell → peak = 2.
+    await _seed_click(
+        client, data["id"], factory,
+        clicked_at=now - timedelta(hours=2),
+    )
+    await _seed_click(
+        client, data["id"], factory,
+        clicked_at=now - timedelta(hours=2, minutes=5),
+    )
+
+    page = await client.get(f"/s/{data['code']}")
+    assert page.status_code == 200
+    html = page.text
+    # heatmap grid + legend rendered with real data
+    assert 'class="heatmap"' in html
+    assert "hm-cell" in html
+    assert "clicks in window" in html
+    assert "peak 2" in html
+    # tag chips in the hero (normalised, hue-coloured)
+    assert "#marketing" in html
+    assert "#docs" in html
+    assert "--tag-h:" in html
+
+
+async def test_public_stats_page_heatmap_empty_state(client: AsyncClient):
+    data = await shorten(client, url="https://example.com/heatmap-empty")
+    page = await client.get(f"/s/{data['code']}")
+    assert page.status_code == 200
+    assert "No clicks in the last" in page.text

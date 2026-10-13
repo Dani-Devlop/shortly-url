@@ -214,3 +214,48 @@ async def test_public_stats_page_linked_from_api_reference(client):
     assert response.status_code == 200
     assert "/s/{code}" in response.text
     assert "public stats page" in response.text
+
+
+async def test_dashboard_v8_custom_alias_and_tags_fields(client):
+    response = await client.get("/")
+    assert response.status_code == 200
+    body = response.text
+    assert 'id="newAlias"' in body          # custom alias on create (v1.7.0)
+    assert 'id="newTags"' in body           # tags on create
+    assert 'id="editTags"' in body          # tags on edit
+    assert "custom_code" in body            # wired into the POST body
+    assert "parseTags" in body              # comma-split helper
+    assert 'id="detailHeatmap"' in body     # insights heatmap section
+    assert "loadHeatmap" in body            # client fetch of /hours
+
+
+async def test_dashboard_tag_chips_render_and_filter(client):
+    tagged = await shorten(
+        client, url="https://example.com/tagged", tags=["News", "Launch Week"]
+    )
+    other = await shorten(client, url="https://example.com/untagged")
+
+    page = await client.get("/")
+    assert page.status_code == 200
+    body = page.text
+    assert "#news" in body                  # normalised chip
+    assert "#launch-week" in body
+    assert "--tag-h:" in body               # deterministic hue applied
+    assert "Tag" in body                    # filter select appears once tags exist
+
+    row = body.split(f'data-code="{tagged["code"]}"')[1].split("</tr>")[0]
+    assert "tag-chip" in row
+    other_row = body.split(f'data-code="{other["code"]}"')[1].split("</tr>")[0]
+    assert "tag-chip" not in other_row
+
+    filtered = await client.get("/", params={"tag": "news"})
+    assert filtered.status_code == 200
+    fbody = filtered.text
+    assert f'data-code="{tagged["code"]}"' in fbody
+    assert f'data-code="{other["code"]}"' not in fbody
+    assert "filtered by" in fbody           # active-filter indicator
+    assert "#news" in fbody
+
+    empty = await client.get("/", params={"tag": "no-such-tag"})
+    assert empty.status_code == 200
+    assert "No links yet" in empty.text      # empty state for zero matches

@@ -20,6 +20,8 @@ from app.schemas.link import (
     DailyStats,
     DeviceBreakdownOut,
     DeviceStat,
+    HourCell,
+    HoursOut,
     ReferrerStat,
     ReferrerWindowOut,
     SparklineItem,
@@ -29,6 +31,7 @@ from app.schemas.link import (
 from app.services.link_service import get_link_by_code
 from app.services.stats_service import (
     count_unique_clicks,
+    get_clicks_by_hour_for_links,
     get_daily_clicks,
     get_daily_clicks_for_links,
     get_device_breakdown_global,
@@ -211,6 +214,35 @@ async def link_referrer_window(
         window_days=days,
         total=total,
         items=[ReferrerStat(source=source or "direct", clicks=clicks) for source, clicks in rows],
+    )
+
+
+@router.get("/{code}/hours", response_model=HoursOut)
+async def link_hours(
+    code: str,
+    days: int = Query(default=30, ge=1, le=90),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> HoursOut:
+    """Clicks by (day-of-week, hour-of-day) over a rolling window — a 7×24 heatmap.
+
+    Always returns exactly 168 zero-filled cells (Sunday 00:00 first, UTC).
+    ``total`` is the window's click count; ``peak`` the busiest single cell.
+    """
+    link = await _owned_link(db, code, user)
+    raw = await get_clicks_by_hour_for_links(db, [link.id], days=days)
+    cells = [
+        HourCell(dow=dow, hour=hour, clicks=raw.get((dow, hour), 0))
+        for dow in range(7)
+        for hour in range(24)
+    ]
+    total = sum(cell.clicks for cell in cells)
+    return HoursOut(
+        code=link.code,
+        window_days=days,
+        total=total,
+        peak=max((cell.clicks for cell in cells), default=0),
+        cells=cells,
     )
 
 

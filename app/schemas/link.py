@@ -4,6 +4,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
+from app.core.tags import normalize_tags
 from app.core.utm import normalize_utm_template
 
 
@@ -45,12 +46,22 @@ class ShortenRequest(BaseModel):
             "params on the short URL and on the destination take precedence."
         ),
     )
+    tags: list[str] = Field(
+        default_factory=list,
+        max_length=6,
+        examples=[["docs", "launch"]],
+        description=(
+            "Optional organisation tags (max 6): trimmed/lowercased, 2–24 chars, "
+            "letters/digits/-/_ — spaces become '-'. Filter lists with ?tag=."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate(self) -> "ShortenRequest":
         self.expires_at = _ensure_future(self.expires_at)
         try:
             self.utm_template = normalize_utm_template(self.utm_template)
+            self.tags = normalize_tags(self.tags)
         except ValueError as exc:
             raise ValueError(str(exc)) from None
         return self
@@ -94,6 +105,10 @@ class LinkOut(BaseModel):
         default=None,
         description="Default UTM params appended on redirect (campaign template).",
     )
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Organisation tags (alphabetical, lowercased).",
+    )
     total_clicks: int = 0
 
 
@@ -135,19 +150,34 @@ class LinkUpdate(BaseModel):
         max_length=512,
         description="New UTM template. Send null to clear it.",
     )
+    tags: list[str] | None = Field(
+        default=None,
+        max_length=6,
+        description=(
+            "Replaces the whole tag set. Send [] (or null, explicitly) to clear "
+            "all tags; omit the field to leave tags untouched."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate(self) -> "LinkUpdate":
         provided = self.model_fields_set
         if "url" in provided and self.url is None:
             raise ValueError("url cannot be null")
-        if not provided & {"url", "expires_at", "utm_template"}:
-            raise ValueError("provide at least one of 'url', 'expires_at' or 'utm_template'")
+        if not provided & {"url", "expires_at", "utm_template", "tags"}:
+            raise ValueError(
+                "provide at least one of 'url', 'expires_at', 'utm_template' or 'tags'"
+            )
         if "expires_at" in provided:
             self.expires_at = _ensure_future(self.expires_at)
         if "utm_template" in provided:
             try:
                 self.utm_template = normalize_utm_template(self.utm_template)
+            except ValueError as exc:
+                raise ValueError(str(exc)) from None
+        if "tags" in provided:
+            try:
+                self.tags = normalize_tags(self.tags)
             except ValueError as exc:
                 raise ValueError(str(exc)) from None
         return self
@@ -237,6 +267,24 @@ class SparklineItem(BaseModel):
 class SparklinesOut(BaseModel):
     window_days: int
     items: list[SparklineItem]
+
+
+class HourCell(BaseModel):
+    dow: int = Field(ge=0, le=6, description="Day of week, 0=Sunday … 6=Saturday (UTC).")
+    hour: int = Field(ge=0, le=23, description="Hour of day 0–23 (UTC).")
+    clicks: int
+
+
+class HoursOut(BaseModel):
+    """Envelope for GET /api/stats/{code}/hours — zero-filled 7×24 grid."""
+
+    code: str
+    window_days: int
+    total: int = Field(description="Clicks recorded in the window (sum of all cells).")
+    peak: int = Field(description="Highest single (dow, hour) cell in the window.")
+    cells: list[HourCell] = Field(
+        description="Exactly 168 cells (7 days × 24 hours), Sunday 00:00 first.",
+    )
 
 
 class ActivityItem(BaseModel):
