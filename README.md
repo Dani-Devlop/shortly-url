@@ -11,6 +11,16 @@ A fast, production-ready link shortener with click analytics — **Python 3.12 �
 
 ## 🌐 Live Demo
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Dani-Devlop/shortly-url)
+
+> **⚠️ Heads-up:** Render hosts this demo on **your** Render account, so the URLs below only
+> answer **after** you apply the blueprint with the one-click button above (~2 minutes,
+> zero configuration — `render.yaml` pre-wires the API, PostgreSQL and Redis together and
+> sets `BASE_URL`, `MASTER_API_KEY` and `IP_HASH_SALT` for you).
+> Until then Render's edge answers `404 Not Found` (`x-render-routing: no-server`).
+
+Once deployed:
+
 | What | URL |
 |---|---|
 | API | https://shortly-url-api.onrender.com |
@@ -18,9 +28,9 @@ A fast, production-ready link shortener with click analytics — **Python 3.12 �
 | Interactive docs (Swagger) | https://shortly-url-api.onrender.com/docs |
 | Health probe | https://shortly-url-api.onrender.com/health |
 
-> The demo becomes live once the repository is connected to Render via the included `render.yaml` blueprint (see [Deployment](#-deployment-on-render)). Free Render instances sleep when idle — the first request may take ~30s.
+**Demo API key:** `shortly-demo-key-2024` — pre-set in `render.yaml` as the `MASTER_API_KEY` so the demo works out of the box. Rotate it for any serious use.
 
-**Demo API key:** `shortly-demo-key-2024` — set this as the `MASTER_API_KEY` secret when deploying so the demo works out of the box. Rotate it for any serious use.
+Free Render instances sleep when idle — the first request may take ~30s to wake up.
 
 ## 📦 Postman Collection
 
@@ -180,13 +190,26 @@ tests/                 # pytest + pytest-asyncio suite (async SQLite, fakeredis)
 
 ## 🚢 Deployment on Render
 
-1. Push to `main` (already done by CI-friendly repo layout) and open [Render Blueprint](https://dashboard.render.com/select-repo?type=blueprint).
-2. Select `Dani-Devlop/shortly-url` — Render reads `render.yaml` and provisions:
-   - **Web Service** (`shortly-url-api`) — FastAPI, migrations run before start
-   - **PostgreSQL** (`shortly-url-db`) — managed, internal-only
-   - **Key Value** (`shortly-url-cache`) — managed Redis
-3. Set the secret env vars on the web service: `MASTER_API_KEY` (e.g. the demo key above) and `BASE_URL` (`https://shortly-url-api.onrender.com`).
-4. Optional: add a `RENDER_DEPLOY_HOOK_URL` secret to the repo and `.github/workflows/deploy.yml` will trigger deploys on every push.
+**One-click (recommended):** click the **Deploy to Render** button at the top of this README, review the blueprint summary, and hit **Apply**. Render then:
+
+1. provisions **Web Service** (`shortly-url-api`), **PostgreSQL** (`shortly-url-db`, internal-only) and **Key Value** (`shortly-url-cache`, managed Redis) — all wired together by `render.yaml`;
+2. builds with `pip install -r requirements.txt` (Python pinned to 3.12.9 via `PYTHON_VERSION`);
+3. on boot runs `alembic upgrade head` (migrations) and starts `uvicorn app.main:app --host 0.0.0.0 --port $PORT`;
+4. serves the dashboard at `https://shortly-url-api.onrender.com` — env vars are already pre-set (`BASE_URL`, demo `MASTER_API_KEY`, generated `IP_HASH_SALT`).
+
+**Manual alternative:** Render dashboard → **New → Blueprint** → select `Dani-Devlop/shortly-url` → **Apply** (same result).
+
+**Auto-deploys:** `autoDeploy: true` redeploys on every push to `main`. Optionally add a `RENDER_DEPLOY_HOOK_URL` repo secret and `.github/workflows/deploy.yml` will also trigger a deploy on each push.
+
+**Troubleshooting:**
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `404 Not Found` with header `x-render-routing: no-server` | No live deployment behind the URL — the blueprint was never applied (or every deploy failed) | Apply the blueprint via the button above; then check the web service's **Events**/**Logs** tabs in the Render dashboard |
+| First request hangs ~30–60 s, then loads | Free instance woke from idle sleep | Nothing to do — subsequent requests are fast |
+| `502`/`503` right after applying | Build/start still in progress | Watch the deploy logs until the service reports **Live** (`/health` returns 200) |
+| Deploys succeeded before, now DB errors | Render **free PostgreSQL expires after 30 days** | Upgrade the database plan, or delete & recreate it — migrations re-run automatically on the fresh DB |
+| Blueprint apply complains about existing resources | A previous partial apply left resources behind | Delete the stale `shortly-url-*` resources in the dashboard, then re-apply |
 
 ## 🔒 Security Notes
 
