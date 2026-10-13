@@ -278,13 +278,19 @@
     /* floating bulk-action bar */
     #bulkBar {
       position: fixed; left: 50%; bottom: 1.1rem; transform: translate(-50%, 140%);
+      visibility: hidden; pointer-events: none;
       z-index: 55; display: flex; align-items: center; gap: .55rem; flex-wrap: wrap;
       background: var(--card); border: 1px solid var(--border-strong); border-radius: 14px;
       padding: .6rem .9rem; box-shadow: 0 14px 40px rgba(2, 6, 23, .5);
-      transition: transform .28s cubic-bezier(.2, .8, .3, 1); max-width: calc(100vw - 2rem);
+      transition: transform .28s cubic-bezier(.2, .8, .3, 1), visibility 0s linear .28s;
+      max-width: calc(100vw - 2rem);
       padding-bottom: calc(.6rem + env(safe-area-inset-bottom, 0px));
     }
-    #bulkBar.show { transform: translate(-50%, 0); }
+    #bulkBar.show {
+      transform: translate(-50%, 0);
+      visibility: visible; pointer-events: auto;
+      transition: transform .28s cubic-bezier(.2, .8, .3, 1);
+    }
     #bulkBar .bulk-count { font-weight: 700; font-size: .85rem; margin-right: .15rem; }
     #bulkBar .bulk-sep { width: 1px; align-self: stretch; background: var(--border); }
     #bulkBar button { min-height: 36px; padding: .35rem .8rem; font-size: .8rem; }
@@ -372,6 +378,10 @@
     .ref-chip .ref-bar { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent-strong), var(--accent)); min-width: 3px; }
     .ref-chip .ref-count { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
     .ref-title { font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: .2rem; }
+    .ref-title .hint {
+      text-transform: none; letter-spacing: normal; font-weight: 500;
+      color: var(--accent); opacity: .85;
+    }
     .click-log .ref { color: var(--accent); opacity: .85; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     /* ---- devices panel ---- */
@@ -1305,7 +1315,8 @@
     if (Date.now() - (entry.at || 0) > 10000) return;
     if (!getKey()) return;
     const noun = entry.codes.length === 1 ? 'link' : 'links';
-    const label = (entry.action === 'restore' ? 'Restored ' : 'Archived ') + entry.codes.length + ' ' + noun;
+    // The queue stores the UNDO action; the toast must describe the just-completed one.
+    const label = (entry.action === 'restore' ? 'Archived ' : 'Restored ') + entry.codes.length + ' ' + noun;
     showActionToast(label, 'Undo', async () => {
       try {
         const res = await fetch('/api/links/bulk-action', {
@@ -1319,7 +1330,7 @@
           setTimeout(() => location.reload(), 700);
         } else showToast('Undo failed', true);
       } catch { showToast('Network error', true); }
-    }, entry.action === 'restore' ? '↺' : '📦');
+    }, entry.action === 'restore' ? '📦' : '↺');
   }
   flushUndo();
 
