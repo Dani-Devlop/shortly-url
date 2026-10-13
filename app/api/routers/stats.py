@@ -44,7 +44,7 @@ from app.services.stats_service import (
     get_device_breakdown_global,
     get_recent_clicks,
     get_recent_clicks_global,
-    get_referrer_stats,
+    get_referrer_device_stats,
     get_tag_rollup,
     get_total_clicks,
 )
@@ -316,14 +316,19 @@ async def link_referrer_window(
 
     ``items`` are ranked sources (``direct`` when the referer was absent);
     ``total`` counts every click in the window, including beyond ``limit``.
+    Each item carries a ``devices`` cross-tab (clicks per device class for
+    that source) so clients can render stacked bars without extra calls.
     """
     link = await _owned_link(db, code, user)
-    rows, total = await get_referrer_stats(db, link, days=days, limit=limit)
+    rows, total = await get_referrer_device_stats(db, link, days=days, limit=limit)
     return ReferrerWindowOut(
         code=link.code,
         window_days=days,
         total=total,
-        items=[ReferrerStat(source=source or "direct", clicks=clicks) for source, clicks in rows],
+        items=[
+            ReferrerStat(source=source or "direct", clicks=clicks, devices=devices)
+            for source, clicks, devices in rows
+        ],
     )
 
 

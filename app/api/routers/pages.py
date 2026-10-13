@@ -7,7 +7,7 @@ import math
 import os
 import re
 from datetime import UTC, datetime, timedelta
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse
@@ -303,6 +303,31 @@ async def dashboard(
     if per_page not in PER_PAGE_CHOICES:
         per_page = 25
     active_tag = (tag or "").strip().lower() or None
+    # Segmented status pills: each pill carries the current query params so a
+    # click switches status without losing sort / tag / page / bots state.
+    shared_params: dict[str, str] = {"sort": sort, "per_page": str(per_page)}
+    if active_tag:
+        shared_params["tag"] = active_tag
+    if code:
+        shared_params["code"] = code
+    if page > 1:
+        shared_params["page"] = str(page)
+    if not bots:
+        shared_params["bots"] = "0"
+    status_titles = {
+        "active": "Show active links",
+        "archived": "Show archived links",
+        "all": "Show active and archived links",
+    }
+    status_links = [
+        {
+            "value": status,
+            "label": status.capitalize(),
+            "title": status_titles[status],
+            "href": "/?" + urlencode({**shared_params, "status": status}),
+        }
+        for status in ("active", "archived", "all")
+    ]
     context: dict = {
         "version": __version__,
         "summary": {"total_links": 0, "total_clicks": 0, "clicks_7d": 0, "avg_clicks": "0"},
@@ -329,6 +354,7 @@ async def dashboard(
         "active_tag": active_tag or "",
         "link_status": link_status,
         "status_choices": ("active", "archived", "all"),
+        "status_links": status_links,
         "archived_count": 0,
         "heatmap_days": HEATMAP_DAYS,
         "tag_days": TAG_PANEL_DAYS,
@@ -507,13 +533,21 @@ def _stats_chart_bars(points: list[int]) -> list[dict]:
 async def public_stats_page(
     request: Request,
     code: str,
+    bots: bool = Query(
+        default=True,
+        description="Include the 'bot' device class in the page's panels.",
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Public, shareable stats page for one short link — no API key needed.
 
     Privacy posture mirrors the owner APIs: referrers are reduced to hosts,
     IP hashes are never shown. Unknown/malformed codes render a styled 404.
+    ``?bots=0`` switches the click-derived panels (devices, when, sources,
+    recent) to human traffic only — the hero totals stay truthful all-click
+    numbers, and a toggle chip lets visitors switch back.
     """
+    exclude_bots = not bots
     base_url = str(request.base_url).rstrip("/")
     context: dict = {
         "version": __version__,
@@ -529,6 +563,8 @@ async def public_stats_page(
         "recent": [],
         "heatmap": None,
         "stats_url": f"{base_url}/s/{code}",
+        "bots": bots,
+        "bots_toggle_url": f"/s/{code}?bots={'1' if not bots else '0'}",
     }
     status_code = 200
     if not PUBLIC_CODE_PATTERN.match(code):
@@ -545,12 +581,16 @@ async def public_stats_page(
             total = await count_clicks(db, link.id)
             series = await get_daily_clicks_for_links(db, [link.id], days=STATS_PAGE_DAYS)
             points = series.get(link.id, [0] * STATS_PAGE_DAYS)
-            dev_items = await get_device_breakdown(db, link)
+            dev_items = await get_device_breakdown(db, link, exclude_bots=exclude_bots)
             dev_total = sum(clicks for _, clicks in dev_items)
-            refs = await get_top_referrers(db, link, limit=STATS_PAGE_REFERRERS)
-            recent_rows = await get_recent_clicks(db, link, limit=STATS_PAGE_RECENT)
+            refs = await get_top_referrers(
+                db, link, limit=STATS_PAGE_REFERRERS, exclude_bots=exclude_bots
+            )
+            recent_rows = await get_recent_clicks(
+                db, link, limit=STATS_PAGE_RECENT, exclude_bots=exclude_bots
+            )
             hour_raw = await get_clicks_by_hour_for_links(
-                db, [link.id], days=HEATMAP_DAYS
+                db, [link.id], days=HEATMAP_DAYS, exclude_bots=exclude_bots
             )
             context.update(
                 {

@@ -432,6 +432,54 @@
     }
     .autoref .count { font-variant-numeric: tabular-nums; opacity: .8; min-width: 1.4rem; text-align: left; }
 
+    /* ---- v11 segmented status pills ---- */
+    .seg {
+      display: inline-flex; align-items: center; gap: 2px; padding: 3px;
+      background: var(--input-bg); border: 1px solid var(--border-strong); border-radius: 999px;
+    }
+    .seg-item {
+      display: inline-flex; align-items: center; gap: .32rem; padding: .26rem .72rem;
+      border-radius: 999px; font-size: .76rem; font-weight: 600; color: var(--muted);
+      text-decoration: none; transition: color .15s ease, background .15s ease, transform .15s ease;
+      white-space: nowrap;
+    }
+    .seg-item:hover { color: var(--accent); }
+    .seg-item:active { transform: scale(.97); }
+    .seg-item.on { background: var(--accent); color: var(--accent-ink); box-shadow: 0 1px 6px rgba(2, 6, 23, .25); }
+    .seg-item .n { font-size: .68rem; font-variant-numeric: tabular-nums; opacity: .85; }
+
+    /* ---- v11 row hover accent + focus rings ---- */
+    tbody tr td:first-child { box-shadow: inset 3px 0 0 transparent; transition: box-shadow .15s ease, background .12s ease; }
+    tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    :focus:not(:focus-visible) { outline: none; }
+    kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .68rem;
+      background: var(--input-bg); border: 1px solid var(--border-strong); border-bottom-width: 2px;
+      border-radius: 5px; padding: .04rem .34rem; color: var(--muted); white-space: nowrap;
+    }
+
+    /* ---- v11 toast action button (undo) ---- */
+    #toast.has-act { pointer-events: auto; }
+    .toast-act {
+      margin-left: .4rem; background: var(--accent); color: var(--accent-ink); border: 0;
+      border-radius: 999px; padding: .24rem .72rem; font-size: .74rem; font-weight: 700;
+      cursor: pointer; transition: filter .15s ease, transform .15s ease;
+    }
+    .toast-act:hover { filter: brightness(1.1); }
+    .toast-act:active { transform: scale(.96); }
+
+    /* ---- v11 stacked device segments in referrer bars ---- */
+    .ref-bar-wrap { display: flex; }
+    .ref-seg { display: block; height: 100%; min-width: 2px; }
+    .ref-seg + .ref-seg { box-shadow: -1px 0 0 rgba(0, 0, 0, .18); }
+    .ref-seg:first-child { border-radius: 4px 0 0 4px; }
+    .ref-seg:last-child { border-radius: 0 4px 4px 0; }
+    .ref-seg:only-child { border-radius: 4px; }
+    .src-legend { display: flex; gap: .7rem; flex-wrap: wrap; font-size: .68rem; color: var(--muted); margin-top: .3rem; }
+    .src-legend .lg { display: inline-flex; align-items: center; gap: .3rem; }
+    .src-legend .sw { width: 8px; height: 8px; border-radius: 3px; display: inline-block; }
+
     /* ---- devices panel bots toggle ---- */
     .bots-toggle {
       margin-left: auto; font-size: .68rem; font-weight: 700; text-decoration: none;
@@ -878,6 +926,7 @@
         <h2 style="margin:0">🔗 Recent links
           {% if active_tag %}<span class="hint">filtered by <a class="tag-chip" style="--tag-h: 152" href="/">#{{ active_tag }} ✕</a></span>{% endif %}
           <span class="hint">hover a row for actions</span>
+          <span class="hint"><kbd>/</kbd> filter · <kbd>n</kbd> new link</span>
         </h2>
         <form method="get" action="/" style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap">
           <input type="hidden" name="code" value="{{ lookup }}">
@@ -913,13 +962,13 @@
               </select>
             </label>
           {% endif %}
-          <label>Status
-            <select name="status" onchange="this.form.submit()" aria-label="Filter by archive status">
-              {% for s in status_choices %}
-                <option value="{{ s }}" {{ 'selected' if link_status == s }}>{{ s | capitalize }}{% if s == 'archived' and archived_count %} ({{ archived_count }}){% endif %}</option>
-              {% endfor %}
-            </select>
-          </label>
+          <span class="seg" role="group" aria-label="Filter by archive status">
+            {% for s in status_links %}
+              <a class="seg-item {{ 'on' if s.value == link_status }}" href="{{ s.href }}" title="{{ s.title }}" aria-current="{{ 'true' if s.value == link_status else 'false' }}">
+                {{ s.label }}{% if s.value == 'archived' and archived_count %} <span class="n">{{ archived_count }}</span>{% endif %}
+              </a>
+            {% endfor %}
+          </span>
         </form>
       </div>
       <div class="table-wrap" role="region" aria-label="Links table">
@@ -1096,12 +1145,19 @@
       <div class="hm-legend" id="hmLegend"></div>
     </div>
     <div>
-      <div class="ref-title">Traffic sources · all time</div>
+      <div class="ref-title">Traffic sources · all time <span class="hint">bar segments = device mix</span></div>
       <div class="ref-chips" id="detailRefs"><span class="note">Loading…</span></div>
     </div>
     <div>
       <div class="ref-title">Devices · all time</div>
       <div class="ref-chips" id="detailDevices"><span class="note">Loading…</span></div>
+    </div>
+    <div class="src-legend" aria-hidden="true">
+      <span class="lg"><span class="sw dev-desktop"></span>desktop</span>
+      <span class="lg"><span class="sw dev-mobile"></span>mobile</span>
+      <span class="lg"><span class="sw dev-tablet"></span>tablet</span>
+      <span class="lg"><span class="sw dev-bot"></span>bot</span>
+      <span class="lg"><span class="sw dev-other"></span>other</span>
     </div>
     <div class="click-log" id="detailClicks"><div class="empty">Loading…</div></div>
     <div class="row">
@@ -1186,7 +1242,7 @@
   <button type="button" id="bulkClearBtn" class="subtle" title="Clear the selection">Clear</button>
 </div>
 
-<div id="toast" role="status" aria-live="polite"><span class="t-icon" id="toastIcon">✓</span><span id="toastMsg"></span></div>
+<div id="toast" role="status" aria-live="polite"><span class="t-icon" id="toastIcon">✓</span><span id="toastMsg"></span><button type="button" id="toastAct" class="toast-act" hidden>Undo</button></div>
 
 <footer>
   <div class="foot-inner">
@@ -1201,15 +1257,99 @@
   const $ = (sel) => document.querySelector(sel);
   const editDlg = $('#editDlg'), confirmDlg = $('#confirmDlg'), detailDlg = $('#detailDlg'), qrDlg = $('#qrDlg'), cmpDlg = $('#cmpDlg');
   let toastTimer;
-  function showToast(message, isError = false, icon) {
+  let toastAction = null;
+  function showToastBase(message, isError, icon, action) {
     const el = $('#toast');
+    const actBtn = $('#toastAct');
     $('#toastMsg').textContent = message;
     $('#toastIcon').textContent = icon || (isError ? '⚠️' : '✓');
     el.classList.toggle('error', isError);
+    toastAction = action || null;
+    if (action) {
+      actBtn.textContent = action.label;
+      actBtn.hidden = false;
+      el.classList.add('has-act');
+    } else {
+      actBtn.hidden = true;
+      el.classList.remove('has-act');
+    }
     el.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+    toastTimer = setTimeout(() => el.classList.remove('show'), action ? 6500 : 2600);
   }
+  function showToast(message, isError = false, icon) {
+    showToastBase(message, isError, icon, null);
+  }
+  function showActionToast(message, actionLabel, onAction, icon) {
+    showToastBase(message, false, icon, { label: actionLabel, cb: onAction });
+  }
+  $('#toastAct').addEventListener('click', () => {
+    const act = toastAction;
+    if (!act) return;
+    $('#toast').classList.remove('show');
+    toastAction = null;
+    act.cb();
+  });
+
+  /* ---- undo queue: survives the post-action reload ---- */
+  function queueUndo(undoAction, codes) {
+    try { sessionStorage.setItem('shortlyUndo', JSON.stringify({ action: undoAction, codes, at: Date.now() })); } catch { /* private mode */ }
+  }
+  function flushUndo() {
+    let entry = null;
+    try {
+      entry = JSON.parse(sessionStorage.getItem('shortlyUndo') || 'null');
+      sessionStorage.removeItem('shortlyUndo');
+    } catch { entry = null; }
+    if (!entry || !entry.codes || !entry.codes.length) return;
+    if (Date.now() - (entry.at || 0) > 10000) return;
+    if (!getKey()) return;
+    const noun = entry.codes.length === 1 ? 'link' : 'links';
+    const label = (entry.action === 'restore' ? 'Restored ' : 'Archived ') + entry.codes.length + ' ' + noun;
+    showActionToast(label, 'Undo', async () => {
+      try {
+        const res = await fetch('/api/links/bulk-action', {
+          method: 'POST', headers: authHeaders(),
+          body: JSON.stringify({ action: entry.action, codes: entry.codes }),
+        });
+        if (res.ok) {
+          const b = await res.json();
+          queueUndo(entry.action === 'restore' ? 'archive' : 'restore', (b.results || []).filter((r) => r.ok).map((r) => r.code));
+          showToast('Reverted ' + entry.codes.length + ' ' + noun, false, '↺');
+          setTimeout(() => location.reload(), 700);
+        } else showToast('Undo failed', true);
+      } catch { showToast('Network error', true); }
+    }, entry.action === 'restore' ? '↺' : '📦');
+  }
+  flushUndo();
+
+  /* ---- keyboard shortcuts: / focuses the table filter, n opens create ---- */
+  document.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target;
+    const typing = t && (t.isContentEditable || (t.closest && t.closest('input, textarea, select')));
+    if (typing || document.querySelector('dialog[open]')) return;
+    if (e.key === '/') {
+      const f = $('#tableFilter');
+      if (f) {
+        e.preventDefault();
+        f.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        f.focus();
+        f.select();
+      }
+    } else if (e.key === 'n' || e.key === 'N') {
+      if (getKey()) {
+        e.preventDefault();
+        const panel = document.querySelector('details.admin');
+        if (panel && !panel.open) panel.open = true;
+        const input = $('#newUrl');
+        if (input) {
+          input.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          input.focus();
+        }
+      }
+    }
+  });
 
   /* ---- theme ---- */
   $('#themeToggle').addEventListener('click', () => {
@@ -1398,6 +1538,7 @@
         method: 'POST', headers: { 'X-API-Key': key },
       });
       if (res.ok) {
+        queueUndo(archive ? 'restore' : 'archive', [code]);
         showToast((archive ? 'Archived ' : 'Restored ') + code, false, archive ? '📦' : '↺');
         setTimeout(() => location.reload(), 800);
       } else {
@@ -1443,6 +1584,9 @@
         const body = await res.json();
         if (res.ok) {
           const nf = body.not_found ? ' · ' + body.not_found + ' not found' : '';
+          const okCodes = (body.results || []).filter((r) => r.ok).map((r) => r.code);
+          if (action === 'archive' && okCodes.length) queueUndo('restore', okCodes);
+          if (action === 'restore' && okCodes.length) queueUndo('archive', okCodes);
           showToast('Bulk ' + action + ': ' + body.updated + ' updated' + nf, false, action === 'delete' ? '🗑️' : (action === 'archive' ? '📦' : '↺'));
           setTimeout(() => location.reload(), 1000);
         } else showToast((body.error && body.error.message) || ('Failed: ' + res.status), true);
@@ -1504,6 +1648,18 @@
       return;
     }
     const max = Math.max.apply(null, list.map((r) => r.clicks).concat([1]));
+    const DEV_ORDER = ['desktop', 'mobile', 'tablet', 'bot', 'other'];
+    function segments(devices, clicks) {
+      const entries = Object.entries(devices || {});
+      if (!entries.length) return '<span class="ref-bar"></span>';
+      const rank = (d) => { const i = DEV_ORDER.indexOf(d); return i === -1 ? 99 : i; };
+      entries.sort((a, b) => rank(a[0]) - rank(b[0]) || b[1] - a[1]);
+      return entries.map(([device, n]) =>
+        '<span class="ref-seg dev-' + escapeHtml(device) + '" style="width:'
+        + Math.max(2, Math.round((n / clicks) * 100)) + '%" title="'
+        + escapeHtml(device) + ': ' + n + '"></span>'
+      ).join('');
+    }
     box.innerHTML = list.map((r) => {
       const isDirect = r.source === 'direct';
       const label = isDirect
@@ -1512,8 +1668,8 @@
       return '<div class="ref-chip">'
         + '<span class="ref-name" title="' + escapeHtml(r.source) + '">' + label + '</span>'
         + '<span class="ref-count">' + r.clicks + '</span>'
-        + '<span class="ref-bar-wrap"><span class="ref-bar" style="width:'
-        + Math.max(4, Math.round((r.clicks / max) * 100)) + '%"></span></span>'
+        + '<span class="ref-bar-wrap" style="width:' + Math.max(4, Math.round((r.clicks / max) * 100)) + '%">'
+        + segments(r.devices, r.clicks) + '</span>'
         + '</div>';
     }).join('');
   }

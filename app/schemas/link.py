@@ -252,6 +252,14 @@ class RecentClickOut(BaseModel):
 class ReferrerStat(BaseModel):
     source: str = Field(description="Referrer URL, or 'direct' when the header was absent.")
     clicks: int
+    devices: dict[str, int] = Field(
+        default_factory=dict,
+        description=(
+            "Clicks per device class for this source (desktop | mobile | tablet |"
+            " bot | other). Sums to ``clicks``. Empty maps are possible on"
+            " legacy cached payloads."
+        ),
+    )
 
 
 class DeviceStat(BaseModel):

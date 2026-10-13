@@ -46,7 +46,7 @@ from app.services.stats_service import (
     get_daily_clicks_for_links,
     get_device_breakdown,
     get_recent_clicks,
-    get_top_referrers,
+    get_referrer_device_stats,
     get_total_clicks,
 )
 
@@ -365,9 +365,12 @@ async def link_detail(
         )
         for click in await get_recent_clicks(db, link, limit=20)
     ]
+    referrer_rows, _referrer_total = await get_referrer_device_stats(
+        db, link, days=None, limit=5
+    )
     referrers = [
-        ReferrerStat(source=source or "direct", clicks=clicks)
-        for source, clicks in await get_top_referrers(db, link, limit=5)
+        ReferrerStat(source=source or "direct", clicks=clicks, devices=devices)
+        for source, clicks, devices in referrer_rows
     ]
     devices = [
         DeviceStat(device=device, clicks=clicks)

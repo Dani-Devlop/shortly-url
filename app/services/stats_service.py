@@ -108,32 +108,42 @@ async def get_daily_clicks(
 
 
 async def get_recent_clicks(
-    db: AsyncSession, link: Link, limit: int = 20
+    db: AsyncSession, link: Link, limit: int = 20, exclude_bots: bool = False
 ) -> list[Click]:
-    """Most recent click rows, newest first (for the link-detail view)."""
+    """Most recent click rows, newest first (for the link-detail view).
+
+    ``exclude_bots=True`` hides crawler-class rows (public page's human view).
+    """
+    stmt = select(Click).where(Click.link_id == link.id)
+    if exclude_bots:
+        stmt = stmt.where(Click.device != "bot")
     rows = await db.execute(
-        select(Click)
-        .where(Click.link_id == link.id)
-        .order_by(Click.clicked_at.desc(), Click.id.desc())
-        .limit(limit)
+        stmt.order_by(Click.clicked_at.desc(), Click.id.desc()).limit(limit)
     )
     return list(rows.scalars().all())
 
 
 async def get_top_referrers(
-    db: AsyncSession, link: Link, limit: int = 5, days: int | None = None
+    db: AsyncSession,
+    link: Link,
+    limit: int = 5,
+    days: int | None = None,
+    exclude_bots: bool = False,
 ) -> list[tuple[str | None, int]]:
     """Traffic sources ranked by clicks.
 
     ``days=None`` aggregates all-time; an integer restricts the window to the
     last N days (rolling). Returns ``(referrer_or_None, clicks)`` — ``None``
     means direct traffic. Ties break alphabetically for deterministic output.
+    ``exclude_bots=True`` drops crawler clicks from the ranking.
     """
     stmt = select(Click.referrer, func.count().label("clicks")).where(
         Click.link_id == link.id
     )
     if days is not None:
         stmt = stmt.where(Click.clicked_at >= datetime.now(UTC) - timedelta(days=days))
+    if exclude_bots:
+        stmt = stmt.where(Click.device != "bot")
     rows = await db.execute(
         stmt.group_by(Click.referrer)
         .order_by(func.count().desc(), Click.referrer.asc())
@@ -142,29 +152,56 @@ async def get_top_referrers(
     return [(row.referrer, int(row.clicks)) for row in rows.all()]
 
 
-async def get_referrer_stats(
-    db: AsyncSession, link: Link, days: int, limit: int
-) -> tuple[list[tuple[str | None, int]], int]:
-    """Windowed referrer breakdown for one link plus the window's click total."""
-    cutoff = datetime.now(UTC) - timedelta(days=days)
-    total = int(
-        await db.scalar(
-            select(func.count())
-            .select_from(Click)
-            .where(Click.link_id == link.id, Click.clicked_at >= cutoff)
-        )
-        or 0
+async def get_referrer_device_stats(
+    db: AsyncSession,
+    link: Link,
+    days: int | None,
+    limit: int,
+    exclude_bots: bool = False,
+) -> tuple[list[tuple[str | None, int, dict[str, int]]], int]:
+    """Referrer × device cross-tab from ONE grouped query.
+
+    Returns ``(items, total)`` where each item is
+    ``(referrer_or_None, clicks, {device: clicks})`` ranked by clicks desc
+    with ties broken alphabetically (direct traffic — ``None`` — sorts first
+    on ties, consistently across PostgreSQL and SQLite). ``total`` counts
+    every click in scope, including sources beyond ``limit``. ``days=None``
+    aggregates all-time; ``exclude_bots=True`` drops the crawler class from
+    both the ranking and each source's device map.
+    """
+    stmt = select(Click.referrer, Click.device, func.count().label("clicks")).where(
+        Click.link_id == link.id
     )
-    items = await get_top_referrers(db, link, limit=limit, days=days)
-    return items, total
+    if days is not None:
+        stmt = stmt.where(Click.clicked_at >= datetime.now(UTC) - timedelta(days=days))
+    if exclude_bots:
+        stmt = stmt.where(Click.device != "bot")
+    rows = await db.execute(stmt.group_by(Click.referrer, Click.device))
+    devices_by_ref: dict[str | None, dict[str, int]] = {}
+    for referrer, device, clicks in rows.all():
+        devices_by_ref.setdefault(referrer, {})[str(device)] = int(clicks)
+    items = sorted(
+        ((ref, sum(dev.values()), dev) for ref, dev in devices_by_ref.items()),
+        key=lambda item: (-item[1], item[0] or ""),
+    )
+    total = sum(clicks for _, clicks, _ in items)
+    return items[:limit], total
 
 
-async def get_device_breakdown(db: AsyncSession, link: Link) -> list[tuple[str, int]]:
-    """All-time device mix for one link, ranked by clicks (deterministic ties)."""
+async def get_device_breakdown(
+    db: AsyncSession, link: Link, exclude_bots: bool = False
+) -> list[tuple[str, int]]:
+    """All-time device mix for one link, ranked by clicks (deterministic ties).
+
+    ``exclude_bots=True`` drops the crawler class (public page's human view).
+    """
+    stmt = select(Click.device, func.count().label("clicks")).where(
+        Click.link_id == link.id
+    )
+    if exclude_bots:
+        stmt = stmt.where(Click.device != "bot")
     rows = await db.execute(
-        select(Click.device, func.count().label("clicks"))
-        .where(Click.link_id == link.id)
-        .group_by(Click.device)
+        stmt.group_by(Click.device)
         .order_by(func.count().desc(), Click.device.asc())
     )
     return [(str(row.device), int(row.clicks)) for row in rows.all()]
@@ -201,14 +238,17 @@ async def get_device_breakdown_global(
 
 
 async def get_clicks_by_hour_for_links(
-    db: AsyncSession, link_ids: list[int], days: int = 30
+    db: AsyncSession,
+    link_ids: list[int],
+    days: int = 30,
+    exclude_bots: bool = False,
 ) -> dict[tuple[int, int], int]:
     """Click counts per (day-of-week, hour-of-day) over a rolling window.
 
     Returns ``{(dow, hour): clicks}`` for the cells that have data — callers
     zero-fill the 7×24 grid. ``dow`` is 0=Sunday … 6=Saturday and ``hour`` is
     0–23, both in UTC, portable across PostgreSQL (``EXTRACT``) and SQLite
-    (``strftime``).
+    (``strftime``). ``exclude_bots=True`` hides crawler-class clicks.
     """
     if not link_ids:
         return {}
@@ -222,11 +262,12 @@ async def get_clicks_by_hour_for_links(
     else:  # SQLite / fallback
         dow = func.strftime("%w", Click.clicked_at)
         hour = func.strftime("%H", Click.clicked_at)
-    rows = await db.execute(
-        select(dow.label("dow"), hour.label("hour"), func.count().label("clicks"))
-        .where(Click.link_id.in_(link_ids), Click.clicked_at >= cutoff)
-        .group_by(dow, hour)
-    )
+    cell_stmt = select(
+        dow.label("dow"), hour.label("hour"), func.count().label("clicks")
+    ).where(Click.link_id.in_(link_ids), Click.clicked_at >= cutoff)
+    if exclude_bots:
+        cell_stmt = cell_stmt.where(Click.device != "bot")
+    rows = await db.execute(cell_stmt.group_by(dow, hour))
     cells: dict[tuple[int, int], int] = {}
     for dow_value, hour_value, clicks in rows.all():
         cells[(int(dow_value), int(hour_value))] = int(clicks)

@@ -74,6 +74,9 @@
     .meta-chip.bad { background: var(--danger-soft); color: var(--danger); }
     .meta-chip.campaign { background: var(--violet-soft); color: var(--violet); max-width: 100%; }
     .meta-chip .k { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; opacity: .85; overflow: hidden; text-overflow: ellipsis; }
+    a.meta-chip { text-decoration: none; transition: filter .15s ease, transform .15s ease; cursor: pointer; }
+    a.meta-chip:hover { filter: brightness(1.12); transform: translateY(-1px); }
+    a.meta-chip.muted-chip { background: var(--border); color: var(--muted); }
     .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
     @media (max-width: 560px) { .cards { grid-template-columns: 1fr 1fr; } }
     .stat {
@@ -240,6 +243,11 @@
         {% if link.utm %}<span class="meta-chip campaign" title="{{ link.utm }}">📣 <span class="k">{{ link.utm }}</span></span>{% endif %}
         {% if link.tags %}{% for t in link.tags %}<span class="tag-chip" style="--tag-h: {{ t.hue }}" title="Organisation tag">#{{ t.tag }}</span>{% endfor %}{% endif %}
         <span class="meta-chip" title="Shareable stats URL — copy and send this page's address">📊 {{ stats_url }}</span>
+        {% if bots %}
+          <a class="meta-chip muted-chip" href="{{ bots_toggle_url }}" title="Crawler clicks are currently included — switch the panels below to human traffic only">🤖 incl. bots · hide</a>
+        {% else %}
+          <a class="meta-chip" href="{{ bots_toggle_url }}" title="Panels below show human clicks only — bring crawler clicks back">🙈 bots hidden · show all</a>
+        {% endif %}
       </div>
     </section>
 
@@ -265,7 +273,7 @@
     </section>
 
     <section class="panel">
-      <h2>🗓 When · last {{ heatmap_days }} days <span class="hint">UTC — hover a cell for detail</span></h2>
+      <h2>🗓 When · last {{ heatmap_days }} days <span class="hint">UTC — hover a cell for detail{% if not bots %} · human clicks{% endif %}</span></h2>
       {% if heatmap and heatmap.peak > 0 %}
         <div class="hm-scroller">
           <div class="heatmap" role="img" aria-label="Clicks by weekday and hour of day, last {{ heatmap_days }} days">
@@ -291,7 +299,7 @@
 
     <section class="grid-2">
       <div class="panel">
-        <h2>📱 Devices <span class="hint">all time</span></h2>
+        <h2>📱 Devices <span class="hint">all time{% if not bots %} · human only{% endif %}</span></h2>
         {% if devices %}
           <div class="dev-bar" role="img" aria-label="Device mix, all time">
             {% for d in devices %}
@@ -309,7 +317,7 @@
         {% endif %}
       </div>
       <div class="panel">
-        <h2>🛰 Top sources <span class="hint">all time</span></h2>
+        <h2>🛰 Top sources <span class="hint">all time{% if not bots %} · human only{% endif %}</span></h2>
         {% if referrers %}
           <div class="ref-chips">
             {% for r in referrers %}
@@ -330,7 +338,7 @@
 
     <section class="grid-2" style="margin-top:1rem">
       <div class="panel">
-        <h2>🕘 Recent clicks <span class="hint">newest {{ recent | length }}</span></h2>
+        <h2>🕘 Recent clicks <span class="hint">newest {{ recent | length }}{% if not bots %} · human only{% endif %}</span></h2>
         {% if recent %}
           <ul class="act-list">
             {% for c in recent %}
