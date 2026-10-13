@@ -37,6 +37,8 @@ The collection ships with variables `baseUrl` and `apiKey` and covers every endp
 - **Redirects** served from a Redis cache-aside layer with a PostgreSQL source of truth (`X-Cache: HIT|MISS` header on every redirect)
 - **Update destinations & expiry** — `PATCH /api/links/{code}` repoints a code and/or sets/clears `expires_at`, invalidating its cache entry
 - **Link expiry** — set `expires_at` on creation or via `PATCH`; expired codes answer `410 Gone` (enforced on cache and DB paths; clicks are no longer recorded)
+- **Link archival (soft delete)** — `POST /api/links/{code}/archive` stashes a link without losing its history: redirects answer `410 Gone` (`error.code: link_archived`, enforced on cache and DB paths) while stats stay readable; `POST /api/links/{code}/restore` brings it back; both idempotent and cache-invalidated; filter lists with `GET /api/links?status=active|archived|all`; the CSV export gains an `archived` column; the public stats page shows a 📦 archived badge
+- **Bulk actions** — `POST /api/links/bulk-action` archives/restores/deletes up to 100 links per call with per-code `ok` / `not_found` results (unknown or foreign codes never fail the batch); surfaced in the dashboard as a bulk-select column with a floating action bar
 - **Bulk shorten** — `POST /api/shorten/bulk` creates up to 25 links per call with per-item results
 - **CSV export** — download your links (`/api/links/export`) or every individual click of a link (`/api/stats/{code}/export`)
 - **Sparklines** — `GET /api/stats/sparklines` returns zero-filled daily click series (powering the dashboard's per-link trend charts)
@@ -46,14 +48,14 @@ The collection ships with variables `baseUrl` and `apiKey` and covers every endp
 - **Query-param forwarding** — `/abc?utm_source=twitter` redirects to the destination with `utm_source=twitter` appended (incoming params win; destination UTMs preserved; fragment-safe)
 - **UTM campaign templates** — store default UTM params per link (`utm_template` on create/PATCH, e.g. `utm_source=newsletter&utm_campaign=launch`); applied on every redirect with clear precedence: explicit short-URL params > destination params > template (validated & normalised, 512-char cap)
 - **Public stats page** — `GET /s/{code}` is a shareable, no-auth HTML page per link: total/unique clicks, 14-day bar chart, device mix, top sources, recent clicks (referrer hosts only — **IP hashes are never shown**) and a QR code; styled 404 for unknown codes; linked from every dashboard row via the ↗ share action
-- **QR codes** at `GET /{code}/qr` — SVG (default) or PNG (`?format=png`), `?size=64–1024` px variants (default 256), public and cacheable
+- **QR codes** at `GET /{code}/qr` — SVG (default) or PNG (`?format=png`), `?size=64–1024` px variants (default 256), **recolourable with `?fg=` / `?bg=` hex params** (3- or 6-digit, `#` optional — e.g. `fg=34d399&bg=0f172a`), public and cacheable
 - **Bot filtering** — `GET /api/stats/devices?days=7&exclude_bots=true` drops crawler traffic; the dashboard's devices panel has a 🤖 one-click bots toggle (`?bots=0`)
 - **Global activity feed** — `GET /api/stats/activity?limit=20` streams the owner's newest clicks across all links (device class, referrer host, truncated IP hash) and powers the dashboard's **🛰 Live activity panel**, which live-polls every 10 s while admin is unlocked
 - **Device analytics** — every click is classified (from the user agent) as `desktop | mobile | tablet | bot | other`; get the mix per link (`device_breakdown` in link detail) or across all your links in a rolling window (`GET /api/stats/devices?days=7`); the dashboard shows a live stacked device bar
 - **Windowed referrers** — `GET /api/stats/{code}/referrers?days=7&limit=10` ranks traffic sources inside a 1–90 day rolling window (`total` counts the whole window even beyond `limit`)
-- **Paginated link listing** — `GET /api/links?limit=20&offset=0` returns `{items, total, limit, offset}`
+- **Paginated link listing** — `GET /api/links?limit=20&offset=0&status=active|archived|all` returns `{items, total, limit, offset, status}`
 - **Link comparison** — `GET /api/stats/compare?codes=a,b&days=14` returns two links' totals, unique visitors and zero-filled daily series side by side (one grouped query); the dashboard toolbar's **⚖️ Compare button** opens a dialog that renders dual sparkline cards, winner highlighting and a plain-language verdict
-- **Interactive dashboard v9** at `/` — dark/light theme toggle (persisted), animated summary cards with **tinted icon badges** and a **weekly trend chip (▲▼ vs prev 7d)**, per-link 7-day sparklines, expiry badges, **📣 UTM campaign chips per row**, **colored #tag chips per row** (click a chip to filter) + **tag filter dropdown**, **devices panel with stacked mix bar + bots toggle**, **🏷 tag-performance panel (ranked bars, hue per tag)**, **🛰 live activity feed (server-rendered + 10 s live-poll)**, insights modal with a **14-day mini bar chart** + **7×24 click-hour heatmap** + **traffic-source bars + device breakdown + device chips per click + unique visitors**, **⚖️ compare dialog (dual sparklines + verdict)**, client-side table filter (matches code/URL/tags), server-side pagination with page-size control, **auto-refresh toggle (30s, pauses while dialogs are open)**, centered animated dialogs, inline QR dialog (**size selector 128–1024 px**, preview/copy/download), quick API reference panel, bulk create, **custom-alias + tags fields on create**, CSV downloads (links, per-link clicks, tags rollup), admin **tag manager (rename/merge/delete)**, and create/edit/delete actions — create & edit dialogs manage destination, expiry, **tags** and the UTM template (API key stays in your browser's sessionStorage)
+- **Interactive dashboard v10** at `/` — dark/light theme toggle (persisted), animated summary cards with **tinted icon badges** and a **weekly trend chip (▲▼ vs prev 7d)**, per-link 7-day sparklines, expiry badges, **📣 UTM campaign chips per row**, **colored #tag chips per row** (click a chip to filter) + **tag filter dropdown**, **Status filter (Active / Archived (n) / All)**, **bulk-select column + floating bulk-action bar (archive/restore/delete)**, per-row **archive/restore action** with hatched + struck-through archived rows, **devices panel with stacked mix bar + bots toggle**, **🏷 tag-performance panel (ranked bars, hue per tag)**, **🛰 live activity feed (server-rendered + 10 s live-poll)**, insights modal with a **14-day mini bar chart** + **7×24 click-hour heatmap** + **traffic-source bars + device breakdown + device chips per click + unique visitors**, **⚖️ compare dialog (dual sparklines + verdict)**, client-side table filter (matches code/URL/tags) with a **no-matches empty state**, sticky **actions column that never clips** (horizontal-scroll friendly), server-side pagination with page-size control, **auto-refresh toggle (30s, pauses while dialogs are open)**, centered animated dialogs, inline QR dialog (**size selector 128–1024 px + ink/background colour pickers + 6 presets**), quick API reference panel, bulk create, **custom-alias + tags fields on create**, CSV downloads (links, per-link clicks, tags rollup), admin **tag manager (rename/merge/delete)**, and create/edit/archive/delete actions — create & edit dialogs manage destination, expiry, **tags** and the UTM template (API key stays in your browser's sessionStorage)
 - **Per-key rate limiting** on `POST /api/shorten` (Redis fixed window, weighted cost for bulk calls, fails open if Redis is down) with **observability headers**: `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset` on success and `Retry-After` on `429`
 - **IP privacy** — visitor IPs are salted & SHA-256 hashed before storage (truncated in UI and exports)
 - **Graceful degradation** — Redis down → falls back to DB; DB down → clean `503/500` JSON errors
@@ -66,7 +68,7 @@ The collection ships with variables `baseUrl` and `apiKey` and covers every endp
 | `POST` | `/api/shorten` | ✅ | Create a short link. Body: `{"url": "...", "custom_code": null, "expires_at": null, "utm_template": "utm_source=...", "tags": ["docs"]}` |
 | `POST` | `/api/shorten/bulk` | ✅ | Shorten 1–25 URLs in one call — per-item `created` / `duplicate` / `error` results |
 | `GET` | `/{code}` | — | `302` redirect (click recorded in background, `X-Cache: HIT\|MISS`, `410 Gone` when expired; query params forwarded + link's UTM template applied) |
-| `GET` | `/{code}/qr` | — | QR code for the short URL — `?format=svg` (default) or `?format=png`, `?size=64–1024` px (default 256; cacheable, public) |
+| `GET` | `/{code}/qr` | — | QR code for the short URL — `?format=svg` (default) or `?format=png`, `?size=64–1024` px (default 256), recolourable `?fg=34d399&bg=0f172a` (3/6-digit hex, `#` optional; cacheable, public) |
 | `GET` | `/s/{code}` | — | **Public stats page** (shareable HTML) — total/unique clicks, 14-day chart, devices, top sources, recent clicks, QR — no API key |
 | `GET` | `/api/stats/{code}` | ✅ | Total + unique clicks for a link |
 | `GET` | `/api/stats/{code}/daily?days=14` | ✅ | Daily aggregated clicks (1–90 day window) |
@@ -79,11 +81,14 @@ The collection ships with variables `baseUrl` and `apiKey` and covers every endp
 | `GET` | `/api/stats/{code}/referrers?days=7&limit=10` | ✅ | Top traffic sources for a link within a rolling window (1–90 days) |
 | `GET` | `/api/stats/{code}/hours?days=30` | ✅ | Zero-filled 7×24 heatmap (weekday × hour, UTC) over a rolling window (1–90 days) — `{cells, total, peak}` |
 | `GET` | `/api/stats/{code}/export` | ✅ | CSV download of a link's individual clicks (truncated IP hashes, referrer + device columns) |
-| `GET` | `/api/links?limit=20&offset=0` | ✅ | Paginated list of the user's links — `{items, total, limit, offset}` (limit 1–100); `&tag=docs` filters by tag |
+| `GET` | `/api/links?limit=20&offset=0` | ✅ | Paginated list of the user's links — `{items, total, limit, offset, status}` (limit 1–100); `&tag=docs` filters by tag, `&status=archived\|all` by archive state |
 | `GET` | `/api/links/export` | ✅ | CSV download of all the user's links (click counts included) |
 | `GET` | `/api/links/{code}` | ✅ | Link detail incl. the 20 most recent clicks (hashed IP prefix, user agent, referrer, device) + all-time top-5 traffic sources + device breakdown + unique clicks + zero-filled 14-day daily series (`daily_14d`) + tags |
 | `PATCH` | `/api/links/{code}` | ✅ | Update destination, expiry, UTM template and/or tags — `{"url": "...", "expires_at": null, "utm_template": "...", "tags": ["new"]}` (null clears the field; `tags` replaces the whole set, `[]` clears all) |
 | `DELETE` | `/api/links/{code}` | ✅ | Delete a link (cascades click rows, invalidates cache) |
+| `POST` | `/api/links/{code}/archive` | ✅ | Soft-delete: stats stay readable, `GET /{code}` answers `410 Gone` (`link_archived`) until restore — idempotent |
+| `POST` | `/api/links/{code}/restore` | ✅ | Undo the archive — redirects work again (idempotent) |
+| `POST` | `/api/links/bulk-action` | ✅ | Archive / restore / delete up to 100 links — body `{"action": "archive\|restore\|delete", "codes": ["..."]}`; per-code `ok`/`not_found` results |
 | `DELETE` | `/api/tags/{tag}` | ✅ | Strip a tag from every one of your links (links are kept) |
 | `GET` | `/health` | — | DB/Redis health probe (`503` when DB is down) |
 | `GET` | `/docs` | — | Interactive Swagger docs |
@@ -134,7 +139,7 @@ Run migrations against a real database with `alembic upgrade head`.
 ## 🧪 Tests
 
 ```bash
-pytest -v          # 264 tests, async SQLite + fakeredis, no services needed
+pytest -v          # 288 tests, async SQLite + fakeredis, no services needed
 ruff check .       # lint
 python scripts/load_test.py --base http://localhost:8000 --code <code> --total 1000 --concurrency 50
 ```

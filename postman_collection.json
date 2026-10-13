@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "b7e6a1c2-3f4d-4e5a-9b8c-1d2e3f4a5b6c",
     "name": "shortly-url API",
-    "description": "Complete collection for the shortly-url link shortener.\n\nSet collection variables `baseUrl` and `apiKey` (Pre-request Scripts tab → Variables) and every request works against local (`http://localhost:8000`) or the live Render demo.\n\nThe **Shorten** request automatically stores the returned code in the `code` collection variable, so Redirect/Stats/Delete requests work right after it.",
+    "description": "Complete collection for the shortly-url link shortener.\n\nSet collection variables `baseUrl` and `apiKey` (Pre-request Scripts tab \u2192 Variables) and every request works against local (`http://localhost:8000`) or the live Render demo.\n\nThe **Shorten** request automatically stores the returned code in the `code` collection variable, so Redirect/Stats/Delete requests work right after it.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -63,7 +63,7 @@
             "shorten"
           ]
         },
-        "description": "Create a short link. Duplicate URLs from the same owner return the existing link. Optional `custom_code` (4–16 chars, letters/digits/-/_), optional `utm_template` (default query params appended on every redirect; explicit short-URL params and destination params take precedence), and optional `tags` (max 6, normalised: trimmed/lowercased, spaces → '-', 2–24 chars). With Redis enabled the response carries X-RateLimit-* headers; exceeding the budget answers 429 with Retry-After."
+        "description": "Create a short link. Duplicate URLs from the same owner return the existing link. Optional `custom_code` (4\u201316 chars, letters/digits/-/_), optional `utm_template` (default query params appended on every redirect; explicit short-URL params and destination params take precedence), and optional `tags` (max 6, normalised: trimmed/lowercased, spaces \u2192 '-', 2\u201324 chars). With Redis enabled the response carries X-RateLimit-* headers; exceeding the budget answers 429 with Retry-After."
       }
     },
     {
@@ -109,7 +109,7 @@
             "bulk"
           ]
         },
-        "description": "Shorten 1–25 URLs in one call. Each item reports created / duplicate / error independently. Consumes one rate-limit unit per URL."
+        "description": "Shorten 1\u201325 URLs in one call. Each item reports created / duplicate / error independently. Consumes one rate-limit unit per URL."
       }
     },
     {
@@ -142,7 +142,7 @@
       }
     },
     {
-      "name": "Stats — Total Clicks",
+      "name": "Stats \u2014 Total Clicks",
       "event": [
         {
           "listen": "test",
@@ -179,7 +179,7 @@
       }
     },
     {
-      "name": "Stats — Sparklines",
+      "name": "Stats \u2014 Sparklines",
       "event": [
         {
           "listen": "test",
@@ -216,7 +216,7 @@
             {
               "key": "days",
               "value": "7",
-              "description": "Window length: 1–30 days"
+              "description": "Window length: 1\u201330 days"
             },
             {
               "key": "limit",
@@ -225,11 +225,11 @@
             }
           ]
         },
-        "description": "Per-link zero-filled daily click series (oldest → newest), newest links first."
+        "description": "Per-link zero-filled daily click series (oldest \u2192 newest), newest links first."
       }
     },
     {
-      "name": "Stats — Daily Clicks",
+      "name": "Stats \u2014 Daily Clicks",
       "event": [
         {
           "listen": "test",
@@ -266,14 +266,14 @@
             {
               "key": "days",
               "value": "14",
-              "description": "Rolling window: 1–90 days"
+              "description": "Rolling window: 1\u201390 days"
             }
           ]
         }
       }
     },
     {
-      "name": "Stats — Device Mix (windowed)",
+      "name": "Stats \u2014 Device Mix (windowed)",
       "request": {
         "method": "GET",
         "header": [
@@ -296,7 +296,7 @@
             {
               "key": "days",
               "value": "7",
-              "description": "rolling window 1–90"
+              "description": "rolling window 1\u201390"
             },
             {
               "key": "exclude_bots",
@@ -305,7 +305,7 @@
             }
           ]
         },
-        "description": "Device mix (desktop/mobile/tablet/bot/other) across the caller's links over a rolling 1–90 day window. Returns {window_days, total, items:[{device, clicks}]}. Set exclude_bots=true to hide crawler traffic."
+        "description": "Device mix (desktop/mobile/tablet/bot/other) across the caller's links over a rolling 1\u201390 day window. Returns {window_days, total, items:[{device, clicks}]}. Set exclude_bots=true to hide crawler traffic."
       },
       "event": [
         {
@@ -330,7 +330,7 @@
       ]
     },
     {
-      "name": "Stats — Activity Feed (recent clicks)",
+      "name": "Stats \u2014 Activity Feed (recent clicks)",
       "request": {
         "method": "GET",
         "header": [
@@ -386,7 +386,7 @@
       ]
     },
     {
-      "name": "Stats — Windowed Referrers",
+      "name": "Stats \u2014 Windowed Referrers",
       "request": {
         "method": "GET",
         "header": [
@@ -430,7 +430,7 @@
       ]
     },
     {
-      "name": "Stats — Click-Hour Heatmap",
+      "name": "Stats \u2014 Click-Hour Heatmap",
       "request": {
         "method": "GET",
         "header": [
@@ -460,11 +460,11 @@
             {
               "key": "days",
               "value": "30",
-              "description": "Rolling window 1–90 days"
+              "description": "Rolling window 1\u201390 days"
             }
           ]
         },
-        "description": "Zero-filled 7×24 heatmap (weekday × hour, UTC) over a rolling window. Returns {code, window_days, total, peak, cells[168]} — cells ordered Sunday 00:00 first. New in v1.7.0."
+        "description": "Zero-filled 7\u00d724 heatmap (weekday \u00d7 hour, UTC) over a rolling window. Returns {code, window_days, total, peak, cells[168]} \u2014 cells ordered Sunday 00:00 first. New in v1.7.0."
       },
       "event": [
         {
@@ -483,7 +483,7 @@
       ]
     },
     {
-      "name": "Stats — Tag Rollup",
+      "name": "Stats \u2014 Tag Rollup",
       "request": {
         "method": "GET",
         "header": [
@@ -534,7 +534,7 @@
       ]
     },
     {
-      "name": "Stats — Compare Two Codes",
+      "name": "Stats \u2014 Compare Two Codes",
       "request": {
         "method": "GET",
         "header": [
@@ -591,7 +591,7 @@
       ]
     },
     {
-      "name": "Tags — Rename (merge)",
+      "name": "Tags \u2014 Rename (merge)",
       "request": {
         "method": "POST",
         "header": [
@@ -644,7 +644,7 @@
       ]
     },
     {
-      "name": "Tags — Delete",
+      "name": "Tags \u2014 Delete",
       "request": {
         "method": "DELETE",
         "header": [
@@ -681,7 +681,7 @@
       ]
     },
     {
-      "name": "Export — Clicks CSV",
+      "name": "Export \u2014 Clicks CSV",
       "event": [
         {
           "listen": "test",
@@ -719,7 +719,7 @@
       }
     },
     {
-      "name": "Export — Links CSV",
+      "name": "Export \u2014 Links CSV",
       "event": [
         {
           "listen": "test",
@@ -799,7 +799,7 @@
             {
               "key": "limit",
               "value": "20",
-              "description": "1–100 (default 20)"
+              "description": "1\u2013100 (default 20)"
             },
             {
               "key": "offset",
@@ -814,7 +814,7 @@
             }
           ]
         },
-        "description": "Paginated list of the user's links — {items, total, limit, offset}. Optional `?tag=` filters by tag. New in v1.7.0."
+        "description": "Paginated list of the user's links \u2014 {items, total, limit, offset}. Optional `?tag=` filters by tag. New in v1.7.0."
       }
     },
     {
@@ -916,7 +916,7 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/{{code}}/qr?format=png&size=512",
+          "raw": "{{baseUrl}}/{{code}}/qr?format=png&fg=111827&bg=ffffff&size=512",
           "host": [
             "{{baseUrl}}"
           ],
@@ -927,17 +927,25 @@
           "query": [
             {
               "key": "format",
-              "value": "png",
-              "description": "svg | png"
+              "value": "png"
             },
             {
               "key": "size",
-              "value": "512",
-              "description": "image width/height in px (64–1024, default 256)"
+              "value": "256"
+            },
+            {
+              "key": "fg",
+              "value": "111827",
+              "description": "Module (ink) colour \u2014 3/6-digit hex, '#' optional"
+            },
+            {
+              "key": "bg",
+              "value": "ffffff",
+              "description": "Background colour \u2014 3/6-digit hex, '#' optional"
             }
           ]
         },
-        "description": "QR code for the short URL. `format=svg` (default) or `format=png`; `size` scales the image (64–1024 px, default 256). PNG answers image/png, SVG image/svg+xml."
+        "description": "QR code for the short URL \u2014 svg (default) or png, size 64-1024 px, recolourable via fg/bg hex params (e.g. fg=34d399&bg=0f172a)."
       }
     },
     {
@@ -955,7 +963,7 @@
             "{{code}}"
           ]
         },
-        "description": "Shareable public stats page for one short link — no API key required. Renders total/unique clicks, a 14-day bar chart, device mix, top traffic sources (hosts only) and the QR code. IP hashes are never exposed. Unknown codes answer 404."
+        "description": "Shareable public stats page for one short link \u2014 no API key required. Renders total/unique clicks, a 14-day bar chart, device mix, top traffic sources (hosts only) and the QR code. IP hashes are never exposed. Unknown codes answer 404."
       },
       "event": [
         {
@@ -970,6 +978,129 @@
           }
         }
       ]
+    },
+    {
+      "name": "Archive Link (soft delete)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('Link is archived', () => pm.expect(body.archived).to.eql(true));",
+              "pm.test('archived_at timestamp set', () => pm.expect(body.archived_at).to.not.eql(null));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/links/{{code}}/archive",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "links",
+            "{{code}}",
+            "archive"
+          ]
+        },
+        "description": "Soft-deletes the link: stats stay readable but GET /{code} answers 410 Gone (error code link_archived) until restored. Idempotent."
+      }
+    },
+    {
+      "name": "Restore Link",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('Link restored', () => pm.expect(body.archived).to.eql(false));",
+              "pm.test('archived_at cleared', () => pm.expect(body.archived_at).to.eql(null));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/links/{{code}}/restore",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "links",
+            "{{code}}",
+            "restore"
+          ]
+        },
+        "description": "Undoes the archive: the short URL redirects again (302). Idempotent."
+      }
+    },
+    {
+      "name": "Bulk Action (archive/restore/delete)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('updated + not_found reconcile results', () => pm.expect(body.updated + body.not_found).to.eql(body.results.length));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"archive\",\n  \"codes\": [\"{{code}}\"]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/links/bulk-action",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "links",
+            "bulk-action"
+          ]
+        },
+        "description": "Archive, restore or delete up to 100 links in one call. action: archive | restore | delete. Unknown/foreign codes are reported per-code as not_found instead of failing the batch."
+      }
     },
     {
       "name": "Delete Link",
@@ -1036,7 +1167,7 @@
       }
     },
     {
-      "name": "Auth — Missing API Key (expect 401)",
+      "name": "Auth \u2014 Missing API Key (expect 401)",
       "event": [
         {
           "listen": "test",
@@ -1073,7 +1204,7 @@
       }
     },
     {
-      "name": "Validation — Invalid URL (expect 422)",
+      "name": "Validation \u2014 Invalid URL (expect 422)",
       "event": [
         {
           "listen": "test",

@@ -176,7 +176,7 @@
       border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
     }
     table { width: 100%; border-collapse: collapse; min-width: 820px; }
-    th, td { padding: .68rem .9rem; text-align: left; border-bottom: 1px solid var(--border); font-size: .88rem; }
+    th, td { padding: .68rem .7rem; text-align: left; border-bottom: 1px solid var(--border); font-size: .88rem; }
     th {
       color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: .7rem;
       letter-spacing: .06em; position: sticky; top: 0; background: var(--card); z-index: 1;
@@ -187,7 +187,7 @@
     @keyframes rowIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
     td a { color: var(--accent); text-decoration: none; font-weight: 600; }
     td a:hover { text-decoration: underline; }
-    .url-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+    .url-cell { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
     .url-cell a { color: var(--muted); font-weight: 400; }
     .url-cell a:hover { color: var(--accent); }
     .clicks-badge {
@@ -261,7 +261,15 @@
     .hm-scroller { overflow-x: auto; padding-bottom: 2px; }
     .hm-scroller .heatmap { min-width: 420px; }
     .actions { display: flex; gap: .3rem; }
-    th:last-child, td:last-child { white-space: nowrap; padding-right: 1.05rem; }
+    /* actions column stays visible when the table scrolls horizontally */
+    th:last-child, td:last-child {
+      white-space: nowrap; padding-right: 1.05rem;
+      position: sticky; right: 0; background: var(--card);
+      box-shadow: -10px 0 10px -8px rgba(2, 6, 23, .35);
+    }
+    tbody tr:hover td:last-child { background: var(--card-hover); }
+    tr.archived-row td:last-child { background: var(--card); }
+    tr.archived-row:hover td:last-child { background: var(--card-hover); }
     th.col-check, td.col-check { width: 34px; text-align: center; padding-right: 0; }
     td.col-check input[type="checkbox"], th.col-check input[type="checkbox"] {
       min-height: 0; width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer;
@@ -282,7 +290,7 @@
     #bulkBar button { min-height: 36px; padding: .35rem .8rem; font-size: .8rem; }
     .icon-btn {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 34px; height: 34px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+      width: 32px; height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border);
       background: transparent; color: var(--muted); cursor: pointer; min-height: 0; padding: 0;
       transition: all .12s ease;
     }
@@ -649,6 +657,7 @@
       header, footer { padding-left: 1rem; padding-right: 1rem; }
       .tagline .hide-sm { display: none; }
       .url-cell { max-width: 150px; }
+      th, td { padding: .6rem .5rem; }
       main { padding-top: 1.1rem; }
       .filter-box input { width: 130px; }
       .filter-box input:not(:placeholder-shown) { width: 160px; }
