@@ -232,6 +232,7 @@
       <div class="meta">
         <span class="meta-chip" title="Short URL">🔗 {{ link.short_url }}</span>
         <span class="meta-chip" title="Created">📅 {{ link.created_abs }}</span>
+        {% if link.archived %}<span class="meta-chip bad" title="Soft-deleted — the short URL currently answers 410 Gone until the owner restores it">📦 archived</span>{% endif %}
         {% if link.expiry %}
           <span class="meta-chip {{ 'bad' if link.expiry.state == 'expired' else ('warn' if link.expiry.state == 'soon' else '') }}" title="{{ link.expiry.abs }}">
             ⏳ {{ link.expiry.label }}</span>

@@ -83,7 +83,7 @@ async def test_dashboard_v4_markup(client):
     assert 'id="filterCount"' in body
     assert "Per page" in body                  # server-side per-page select
     assert "Quick API reference" in body       # left-column panel
-    assert "format=svg|png" in body
+    assert "format&amp;size&amp;fg&amp;bg" in body
     assert 'id="qrDlg"' in body                # QR modal (replaces new-tab link)
     assert "Traffic sources · all time" in body  # referrer chips section
     assert 'class="foot-inner"' in body        # structured footer with version pill
@@ -102,8 +102,8 @@ async def test_dashboard_pagination_controls(client):
 
     page2 = await client.get("/", params={"per_page": 10, "page": 2})
     assert "Showing 11–12 of 12 links" in page2.text
-    # both page-2 rows are present, page-1 rows are not
-    assert page2.text.count('data-code=') == 2
+    # both page-2 rows are present (row + its bulk checkbox both carry data-code)
+    assert page2.text.count('data-code=') == 4
 
     # page number beyond the last page clamps to the last page
     clamped = await client.get("/", params={"per_page": 10, "page": 99})
@@ -199,7 +199,10 @@ async def test_dashboard_qr_size_selector_wired(client):
     response = await client.get("/")
     assert response.status_code == 200
     assert 'id="qrSize"' in response.text
-    assert "applyQrSize" in response.text
+    assert "applyQr" in response.text
+    assert 'id="qrFg"' in response.text   # v1.9.0 colour pickers
+    assert 'id="qrBg"' in response.text
+    assert "qr-swatch" in response.text   # presets
 
 
 async def test_dashboard_utm_create_field_present(client):
@@ -243,9 +246,10 @@ async def test_dashboard_tag_chips_render_and_filter(client):
     assert "--tag-h:" in body               # deterministic hue applied
     assert "Tag" in body                    # filter select appears once tags exist
 
-    row = body.split(f'data-code="{tagged["code"]}"')[1].split("</tr>")[0]
+    # rows carry data-code on both the <tr> and its bulk checkbox → split from the last occurrence
+    row = body.rsplit(f'data-code="{tagged["code"]}"', 1)[1].split("</tr>")[0]
     assert "tag-chip" in row
-    other_row = body.split(f'data-code="{other["code"]}"')[1].split("</tr>")[0]
+    other_row = body.rsplit(f'data-code="{other["code"]}"', 1)[1].split("</tr>")[0]
     assert "tag-chip" not in other_row
 
     filtered = await client.get("/", params={"tag": "news"})

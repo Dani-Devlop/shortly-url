@@ -30,12 +30,13 @@ async def test_links_export_csv_shape(client):
     rows = _parse_csv(response.text)
     assert rows[0] == [
         "code", "short_url", "original_url", "total_clicks", "created_at",
-        "expires_at", "tags",
+        "expires_at", "tags", "archived",
     ]
     assert len(rows) == 2  # header + one link
     assert rows[1][0] == data["code"]
     assert rows[1][3] == "2"
     assert rows[1][6] == ""  # no tags on this link
+    assert rows[1][7] == "no"  # active link
 
 
 async def test_links_export_owner_scope(client):

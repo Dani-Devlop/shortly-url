@@ -108,11 +108,14 @@ async def resolve_target(db: AsyncSession, code: str) -> tuple[dict, bool]:
     """Return ``({"url": ..., "id": ..., "exp": ...}, cache_hit)`` for a short code.
 
     Cache hit → no DB round-trip. Miss → fetch from PostgreSQL and fill the cache.
-    Raises :class:`GoneError` (410) when the link's ``expires_at`` has passed.
+    Raises :class:`GoneError` (410) when the link's ``expires_at`` has passed or
+    the link has been archived (soft-deleted).
     """
     cache_key = f"shortly:short:{code}"
     cached = await cache_get(cache_key)
     if isinstance(cached, dict) and {"url", "id"} <= cached.keys():
+        if cached.get("arch"):
+            raise GoneError("This short link has been archived", code="link_archived")
         if _expired(cached.get("exp")):
             raise GoneError()
         return cached, True
@@ -120,6 +123,8 @@ async def resolve_target(db: AsyncSession, code: str) -> tuple[dict, bool]:
     link = await get_link_by_code(db, code)
     if link is None:
         raise NotFoundError(f"Short code '{code}' does not exist")
+    if link.archived:
+        raise GoneError("This short link has been archived", code="link_archived")
     if link.expires_at is not None and datetime.now(UTC) >= _as_aware(link.expires_at):
         raise GoneError()
 
@@ -128,6 +133,7 @@ async def resolve_target(db: AsyncSession, code: str) -> tuple[dict, bool]:
         "id": link.id,
         "exp": link.expires_at.isoformat() if link.expires_at else None,
         "utm": link.utm_template,
+        "arch": link.archived,
     }
     await cache_set(cache_key, payload, settings.cache_ttl_seconds)
     return payload, False

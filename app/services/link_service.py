@@ -1,7 +1,7 @@
 """Link business logic: creation, lookup, deletion, URL validation."""
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 from sqlalchemy import select
@@ -64,12 +64,14 @@ async def _generate_unique_code(db: AsyncSession) -> str:
 
 def _cache_payload(link: Link) -> dict:
     """Redis cache shape for a link. ``exp`` is an ISO string or None;
-    ``utm`` carries the campaign template applied at redirect time."""
+    ``utm`` carries the campaign template applied at redirect time and
+    ``arch`` flags soft-deleted links (redirect answers 410)."""
     return {
         "url": link.original_url,
         "id": link.id,
         "exp": link.expires_at.isoformat() if link.expires_at else None,
         "utm": link.utm_template,
+        "arch": link.archived,
     }
 
 
@@ -131,6 +133,26 @@ async def delete_link(db: AsyncSession, link: Link) -> None:
     # Invalidate the cached mapping so deleted codes 404 immediately.
     await cache_delete(f"shortly:short:{code}")
     logger.info("deleted link code=%s", code)
+
+
+async def set_archived(db: AsyncSession, link: Link, archived: bool) -> Link:
+    """Soft-delete (archived=True) or reinstate (archived=False) a link.
+
+    Archived links keep their stats and history but stop redirecting —
+    GET /{code} answers 410 Gone until restore. The redirect cache entry is
+    invalidated in both directions so the change is effective immediately.
+    """
+    if link.archived != archived:
+        link.archived = archived
+        link.archived_at = datetime.now(UTC) if archived else None
+        db.add(link)
+        await db.commit()
+        await db.refresh(link)
+        await cache_delete(f"shortly:short:{link.code}")
+        logger.info(
+            "%s link code=%s", "archived" if archived else "restored", link.code
+        )
+    return link
 
 
 async def update_link(

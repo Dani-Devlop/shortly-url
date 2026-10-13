@@ -1,4 +1,4 @@
-"""GET /api/links pagination — {items, total, limit, offset} envelope."""
+"""GET /api/links pagination — {items, total, limit, offset, status} envelope."""
 
 from tests.conftest import AUTH_HEADERS
 from tests.helpers import shorten
@@ -7,9 +7,10 @@ from tests.helpers import shorten
 async def test_list_links_envelope_shape(client):
     await shorten(client, url="https://page.example/1")
     body = (await client.get("/api/links", headers=AUTH_HEADERS)).json()
-    assert set(body.keys()) == {"items", "total", "limit", "offset"}
+    assert set(body.keys()) == {"items", "total", "limit", "offset", "status"}
     assert body["total"] == 1 and len(body["items"]) == 1
     assert body["limit"] == 20 and body["offset"] == 0  # defaults
+    assert body["status"] == "active"  # default filter
 
 
 async def test_pagination_slices_and_total_stays_global(client):

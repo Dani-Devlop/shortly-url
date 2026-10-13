@@ -1,11 +1,14 @@
 """Pydantic v2 request/response schemas."""
 
+import re
 from datetime import UTC, date, datetime, timedelta
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 from app.core.tags import normalize_tags
 from app.core.utm import normalize_utm_template
+
+CODE_FIELD_PATTERN = r"^[A-Za-z0-9_-]{1,32}$"
 
 
 def _ensure_future(value: datetime | None) -> datetime | None:
@@ -110,6 +113,55 @@ class LinkOut(BaseModel):
         description="Organisation tags (alphabetical, lowercased).",
     )
     total_clicks: int = 0
+    archived: bool = Field(
+        default=False,
+        description="Soft-deleted: stats stay readable but the short URL returns 410.",
+    )
+    archived_at: datetime | None = Field(
+        default=None,
+        description="When the link was archived (null while active).",
+    )
+
+
+class BulkActionRequest(BaseModel):
+    """Body for POST /api/links/bulk-action."""
+
+    action: str = Field(
+        ...,
+        pattern="^(archive|restore|delete)$",
+        description="What to do with every listed code.",
+    )
+    codes: list[str] = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        examples=[["repo", "pydocs"]],
+        description="1–100 short codes owned by the authenticated user.",
+    )
+
+    @model_validator(mode="after")
+    def _validate(self) -> "BulkActionRequest":
+        pattern = re.compile(CODE_FIELD_PATTERN)
+        bad = [c for c in self.codes if not pattern.match(c)]
+        if bad:
+            raise ValueError(f"invalid short code(s): {', '.join(bad[:5])}")
+        return self
+
+
+class BulkActionItem(BaseModel):
+    """Per-code result of a bulk action."""
+
+    code: str
+    status: str = Field(description="ok | not_found")
+
+
+class BulkActionOut(BaseModel):
+    """Envelope for POST /api/links/bulk-action."""
+
+    action: str
+    updated: int = Field(description="Codes the action was applied to.")
+    not_found: int = Field(description="Codes that don't exist or belong to someone else.")
+    results: list[BulkActionItem]
 
 
 class StatsOut(BaseModel):
@@ -251,9 +303,13 @@ class LinkPageOut(BaseModel):
     """Paginated envelope for GET /api/links."""
 
     items: list[LinkOut]
-    total: int = Field(description="Total links owned by the user (all pages).")
+    total: int = Field(description="Total matching links owned by the user (all pages).")
     limit: int
     offset: int
+    status: str = Field(
+        default="active",
+        description="Status filter applied: active | archived | all.",
+    )
 
 
 class SparklineItem(BaseModel):

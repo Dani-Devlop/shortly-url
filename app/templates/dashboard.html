@@ -175,7 +175,7 @@
       overflow: auto; max-height: 32rem; background: var(--card);
       border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
     }
-    table { width: 100%; border-collapse: collapse; min-width: 780px; }
+    table { width: 100%; border-collapse: collapse; min-width: 820px; }
     th, td { padding: .68rem .9rem; text-align: left; border-bottom: 1px solid var(--border); font-size: .88rem; }
     th {
       color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: .7rem;
@@ -209,6 +209,15 @@
     .expiry-badge.live { background: var(--accent-soft); color: var(--accent); }
     .expiry-badge.soon { background: var(--amber-soft); color: var(--amber); }
     .expiry-badge.expired { background: var(--danger-soft); color: var(--danger); }
+    .arch-chip {
+      display: inline-block; margin-left: .35rem; border-radius: 999px; padding: .08rem .5rem;
+      font-size: .62rem; font-weight: 700; letter-spacing: .03em; vertical-align: middle;
+      background: rgba(148, 163, 184, .16); color: var(--muted); border: 1px solid var(--border-strong);
+      white-space: nowrap;
+    }
+    tr.archived-row { opacity: .62; background: repeating-linear-gradient(45deg, transparent, transparent 9px, rgba(148, 163, 184, .045) 9px, rgba(148, 163, 184, .045) 18px); }
+    tr.archived-row a { text-decoration-line: line-through; text-decoration-color: var(--muted); text-decoration-thickness: 1px; }
+    tr.archived-row:hover { opacity: .85; }
     .utm-chip {
       display: block; max-width: 128px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       margin-top: .22rem; font-size: .64rem; font-weight: 700; letter-spacing: .02em;
@@ -252,6 +261,25 @@
     .hm-scroller { overflow-x: auto; padding-bottom: 2px; }
     .hm-scroller .heatmap { min-width: 420px; }
     .actions { display: flex; gap: .3rem; }
+    th:last-child, td:last-child { white-space: nowrap; padding-right: 1.05rem; }
+    th.col-check, td.col-check { width: 34px; text-align: center; padding-right: 0; }
+    td.col-check input[type="checkbox"], th.col-check input[type="checkbox"] {
+      min-height: 0; width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer;
+      vertical-align: middle;
+    }
+    /* floating bulk-action bar */
+    #bulkBar {
+      position: fixed; left: 50%; bottom: 1.1rem; transform: translate(-50%, 140%);
+      z-index: 55; display: flex; align-items: center; gap: .55rem; flex-wrap: wrap;
+      background: var(--card); border: 1px solid var(--border-strong); border-radius: 14px;
+      padding: .6rem .9rem; box-shadow: 0 14px 40px rgba(2, 6, 23, .5);
+      transition: transform .28s cubic-bezier(.2, .8, .3, 1); max-width: calc(100vw - 2rem);
+      padding-bottom: calc(.6rem + env(safe-area-inset-bottom, 0px));
+    }
+    #bulkBar.show { transform: translate(-50%, 0); }
+    #bulkBar .bulk-count { font-weight: 700; font-size: .85rem; margin-right: .15rem; }
+    #bulkBar .bulk-sep { width: 1px; align-self: stretch; background: var(--border); }
+    #bulkBar button { min-height: 36px; padding: .35rem .8rem; font-size: .8rem; }
     .icon-btn {
       display: inline-flex; align-items: center; justify-content: center;
       width: 34px; height: 34px; border-radius: var(--radius-sm); border: 1px solid var(--border);
@@ -405,12 +433,24 @@
     .bots-toggle:hover { border-color: var(--accent); color: var(--accent); }
     .bots-toggle.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 
-    /* ---- QR size selector ---- */
+    /* ---- QR size + colour selectors ---- */
     .qr-size-row {
       display: flex; align-items: center; justify-content: center; gap: .5rem;
-      font-size: .78rem; color: var(--muted);
+      font-size: .78rem; color: var(--muted); flex-wrap: wrap;
     }
     .qr-size-row select { min-height: 36px; padding: .3rem .6rem; font-size: .8rem; }
+    .qr-size-row input[type="color"] {
+      min-height: 30px; height: 30px; width: 40px; padding: .1rem; border-radius: 8px;
+      border: 1px solid var(--border-strong); background: var(--input-bg); cursor: pointer;
+    }
+    .qr-swatches { display: flex; justify-content: center; gap: .4rem; flex-wrap: wrap; }
+    .qr-swatch {
+      width: 26px; height: 26px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border-strong);
+      padding: 0; min-height: 0; position: relative; overflow: hidden; transition: transform .12s ease;
+    }
+    .qr-swatch:hover { transform: translateY(-2px) scale(1.08); }
+    .qr-swatch::after { content: ""; position: absolute; inset: 55% 0 0 0; background: var(--sw-fg, #111827); }
+    .qr-swatch { background: var(--sw-bg, #ffffff); }
 
     /* ---- stacked right column (top links + devices + activity) ---- */
     .stack { display: flex; flex-direction: column; gap: 1rem; }
@@ -664,8 +704,11 @@
             <li><span class="method get">GET</span><code>/api/stats/compare?codes=a,b</code><span class="desc">side-by-side compare</span></li>
             <li><span class="method post">POST</span><code>/api/tags/rename</code><span class="desc">rename / merge a tag</span></li>
             <li><span class="method del">DELETE</span><code>/api/tags/{tag}</code><span class="desc">strip a tag everywhere</span></li>
+            <li><span class="method post">POST</span><code>/api/links/{code}/archive</code><span class="desc">soft-delete (410 on redirect)</span></li>
+            <li><span class="method post">POST</span><code>/api/links/{code}/restore</code><span class="desc">undo archive</span></li>
+            <li><span class="method post">POST</span><code>/api/links/bulk-action</code><span class="desc">archive / restore / delete ×100</span></li>
             <li><span class="method get">GET</span><code>/{code}</code><span class="desc">redirect 302</span></li>
-            <li><span class="method get">GET</span><code>/{code}/qr?format=svg|png&size</code><span class="desc">QR code · 64–1024 px</span></li>
+            <li><span class="method get">GET</span><code>/{code}/qr?format&amp;size&amp;fg&amp;bg</code><span class="desc">QR · recolourable</span></li>
             <li><span class="method get">GET</span><code>/s/{code}</code><span class="desc">public stats page</span></li>
             <li><span class="method del">DELETE</span><code>/api/links/{code}</code><span class="desc">remove link</span></li>
           </ul>
@@ -766,7 +809,7 @@
     {% endif %}
 
     <details class="admin">
-      <summary>🔓 Unlock admin — create, bulk-create, edit, export &amp; delete links</summary>
+      <summary>🔓 Unlock admin — create, bulk-create, edit, archive, export &amp; delete links</summary>
       <div class="body">
         <p class="note">Your <strong>X-API-Key</strong> is kept only in this browser (sessionStorage) and is sent directly to the API — never stored server-side.</p>
         <div class="field">
@@ -861,18 +904,29 @@
               </select>
             </label>
           {% endif %}
+          <label>Status
+            <select name="status" onchange="this.form.submit()" aria-label="Filter by archive status">
+              {% for s in status_choices %}
+                <option value="{{ s }}" {{ 'selected' if link_status == s }}>{{ s | capitalize }}{% if s == 'archived' and archived_count %} ({{ archived_count }}){% endif %}</option>
+              {% endfor %}
+            </select>
+          </label>
         </form>
       </div>
       <div class="table-wrap" role="region" aria-label="Links table">
         <table>
           <thead>
-            <tr><th>Code</th><th>Original URL</th><th>Clicks</th><th>Last {{ spark_days }}d</th><th>Expires</th><th>Created</th><th>Actions</th></tr>
+            <tr>
+              <th class="col-check"><input type="checkbox" id="checkAll" aria-label="Select all links on this page" title="Select all on this page"></th>
+              <th>Code</th><th>Original URL</th><th>Clicks</th><th>Last {{ spark_days }}d</th><th>Expires</th><th>Created</th><th>Actions</th>
+            </tr>
           </thead>
           <tbody>
             {% for l in links %}
-              <tr data-code="{{ l.code }}" data-url="{{ l.original_url|lower }}" data-tags="{{ l.tags | map(attribute='tag') | join(' ') }}" style="--i: {{ loop.index0 }}">
+              <tr data-code="{{ l.code }}" data-url="{{ l.original_url|lower }}" data-tags="{{ l.tags | map(attribute='tag') | join(' ') }}" data-archived="{{ '1' if l.archived else '0' }}" class="{{ 'archived-row' if l.archived }}" style="--i: {{ loop.index0 }}">
+                <td class="col-check"><input type="checkbox" class="row-check" data-code="{{ l.code }}" aria-label="Select {{ l.code }} for bulk actions"></td>
                 <td>
-                  <a href="/{{ l.code }}" target="_blank" rel="noopener noreferrer">{{ l.code }}</a>
+                  <a href="/{{ l.code }}" target="_blank" rel="noopener noreferrer">{{ l.code }}</a>{% if l.archived %}<span class="arch-chip" title="Archived {{ l.archived_rel }} — the short URL answers 410 until restored">📦 archived</span>{% endif %}
                   {% if l.utm %}<span class="utm-chip" title="UTM template: {{ l.utm }} — default params appended on redirect">📣 {{ l.utm }}</span>{% endif %}
                   {% if l.tags %}<span class="tag-chips">
                     {%- for t in l.tags -%}
@@ -907,6 +961,13 @@
                     <button class="icon-btn" title="QR code" aria-label="QR code for {{ l.code }}" onclick="openQr('{{ l.code }}', '{{ l.short_url }}')">
                       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM21 14v7h-7v-3"/></svg>
                     </button>
+                    <button class="icon-btn admin-only" title="{{ 'Restore link (undo archive)' if l.archived else 'Archive link (soft delete)' }}" aria-label="{{ 'Restore' if l.archived else 'Archive' }} {{ l.code }}" onclick="toggleArchive('{{ l.code }}', {{ 'false' if l.archived else 'true' }})">
+                      {% if l.archived %}
+                        <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg>
+                      {% else %}
+                        <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="4" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>
+                      {% endif %}
+                    </button>
                     <button class="icon-btn warm admin-only" title="Edit destination / expiry / UTM" aria-label="Edit {{ l.code }}" onclick="openEdit('{{ l.code }}', this)">
                       <svg viewBox="0 0 24 24"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
                     </button>
@@ -917,14 +978,21 @@
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="7">
+              <tr><td colspan="8">
                 <div class="empty">
                   <div class="big">⚡</div>
-                  No links yet — unlock admin above and create your first one,<br>
-                  or call <code class="inline">POST /api/shorten</code> with your <code class="inline">X-API-Key</code>.
+                  {% if link_status == 'archived' %}
+                    Nothing archived yet — archive a link to stash it here without losing its history.
+                  {% else %}
+                    No links yet — unlock admin above and create your first one,<br>
+                    or call <code class="inline">POST /api/shorten</code> with your <code class="inline">X-API-Key</code>.
+                  {% endif %}
                 </div>
               </td></tr>
             {% endfor %}
+            <tr id="filterEmpty" class="row-hidden"><td colspan="8">
+              <div class="empty"><div class="big">🔍</div>No links on this page match your filter.</div>
+            </td></tr>
           </tbody>
         </table>
       </div>
@@ -932,7 +1000,7 @@
         <nav class="pager" aria-label="Table pagination">
           <span class="range">Showing {{ pagination.start }}–{{ pagination.end }} of {{ pagination.total }} links</span>
           <div class="pages">
-            {% set base = '/?sort=' ~ sort ~ '&per_page=' ~ per_page ~ (('&code=' ~ lookup) if lookup else '') ~ (('&tag=' ~ active_tag) if active_tag else '') %}
+            {% set base = '/?sort=' ~ sort ~ '&per_page=' ~ per_page ~ '&status=' ~ link_status ~ (('&code=' ~ lookup) if lookup else '') ~ (('&tag=' ~ active_tag) if active_tag else '') %}
             {% if pagination.has_prev %}
               <a class="page-btn" href="{{ base }}&page={{ pagination.page - 1 }}" rel="prev">← Prev</a>
             {% else %}
@@ -1048,6 +1116,19 @@
         <option value="512">512 px</option>
         <option value="1024">1024 px</option>
       </select>
+      <span class="bulk-sep" style="height:20px; align-self:center"></span>
+      <label for="qrFg" title="Module (ink) colour">Ink</label>
+      <input type="color" id="qrFg" value="#111827" aria-label="QR ink colour">
+      <label for="qrBg" title="Background colour">BG</label>
+      <input type="color" id="qrBg" value="#ffffff" aria-label="QR background colour">
+    </div>
+    <div class="qr-swatches" role="group" aria-label="QR colour presets">
+      <button type="button" class="qr-swatch" title="Classic — dark on white" style="--sw-fg:#111827; --sw-bg:#ffffff" data-fg="#111827" data-bg="#ffffff" aria-label="Preset: dark on white"></button>
+      <button type="button" class="qr-swatch" title="Emerald — on deep slate" style="--sw-fg:#34d399; --sw-bg:#0f172a" data-fg="#34d399" data-bg="#0f172a" aria-label="Preset: emerald on slate"></button>
+      <button type="button" class="qr-swatch" title="Violet on cream" style="--sw-fg:#7c3aed; --sw-bg:#faf5ff" data-fg="#7c3aed" data-bg="#faf5ff" aria-label="Preset: violet on cream"></button>
+      <button type="button" class="qr-swatch" title="Amber on espresso" style="--sw-fg:#fbbf24; --sw-bg:#1c1917" data-fg="#fbbf24" data-bg="#1c1917" aria-label="Preset: amber on espresso"></button>
+      <button type="button" class="qr-swatch" title="Teal on mint" style="--sw-fg:#0f766e; --sw-bg:#f0fdfa" data-fg="#0f766e" data-bg="#f0fdfa" aria-label="Preset: teal on mint"></button>
+      <button type="button" class="qr-swatch" title="Rose on blush" style="--sw-fg:#e11d48; --sw-bg:#fff1f2" data-fg="#e11d48" data-bg="#fff1f2" aria-label="Preset: rose on blush"></button>
     </div>
     <div class="row" style="justify-content:center">
       <button type="button" id="qrCopyBtn" class="ghost">⧉ Copy link</button>
@@ -1086,6 +1167,15 @@
     </div>
   </div>
 </dialog>
+
+<div id="bulkBar" role="toolbar" aria-label="Bulk actions on selected links">
+  <span class="bulk-count"><span id="bulkCount">0</span> selected</span>
+  <span class="bulk-sep" aria-hidden="true"></span>
+  <button type="button" id="bulkArchiveBtn" class="ghost" title="Archive the selected links (soft delete)">📦 Archive</button>
+  <button type="button" id="bulkRestoreBtn" class="ghost" title="Restore the selected links">↺ Restore</button>
+  <button type="button" id="bulkDeleteBtn" class="btn-danger-ghost" title="Permanently delete the selected links and their clicks">🗑 Delete</button>
+  <button type="button" id="bulkClearBtn" class="subtle" title="Clear the selection">Clear</button>
+</div>
 
 <div id="toast" role="status" aria-live="polite"><span class="t-icon" id="toastIcon">✓</span><span id="toastMsg"></span></div>
 
@@ -1275,6 +1365,7 @@
     const input = $('#tableFilter');
     if (!input) return;
     const count = $('#filterCount');
+    const emptyRow = $('#filterEmpty');
     const rows = Array.from(document.querySelectorAll('tbody tr[data-code]'));
     input.addEventListener('input', () => {
       const q = input.value.trim().toLowerCase();
@@ -1286,18 +1377,86 @@
         if (hit) visible += 1;
       });
       count.textContent = q ? visible + '/' + rows.length + ' shown' : '';
+      if (emptyRow) emptyRow.classList.toggle('row-hidden', visible !== 0);
     });
+  })();
+
+  /* ---- archive / restore one link ---- */
+  async function toggleArchive(code, archive) {
+    const key = requireKey(); if (!key) return;
+    try {
+      const res = await fetch('/api/links/' + encodeURIComponent(code) + (archive ? '/archive' : '/restore'), {
+        method: 'POST', headers: { 'X-API-Key': key },
+      });
+      if (res.ok) {
+        showToast((archive ? 'Archived ' : 'Restored ') + code, false, archive ? '📦' : '↺');
+        setTimeout(() => location.reload(), 800);
+      } else {
+        const b = await res.json().catch(() => ({}));
+        showToast((b.error && b.error.message) || ('Failed: ' + res.status), true);
+      }
+    } catch { showToast('Network error', true); }
+  }
+
+  /* ---- bulk selection + bulk actions ---- */
+  (function bulkActions() {
+    const bar = $('#bulkBar');
+    const checkAll = $('#checkAll');
+    if (!bar || !checkAll) return;
+    const counter = $('#bulkCount');
+    const boxes = Array.from(document.querySelectorAll('.row-check'));
+    const selected = () => boxes.filter((b) => b.checked).map((b) => b.dataset.code);
+    function refresh() {
+      const n = boxes.filter((b) => b.checked).length;
+      counter.textContent = String(n);
+      bar.classList.toggle('show', n > 0);
+      if (checkAll) checkAll.checked = n > 0 && n === boxes.length;
+    }
+    boxes.forEach((b) => b.addEventListener('change', refresh));
+    checkAll.addEventListener('change', () => {
+      boxes.forEach((b) => { b.checked = checkAll.checked; });
+      refresh();
+    });
+    $('#bulkClearBtn').addEventListener('click', () => {
+      boxes.forEach((b) => { b.checked = false; });
+      if (checkAll) checkAll.checked = false;
+      refresh();
+    });
+    async function run(action, confirmLabel) {
+      const key = requireKey(); if (!key) return;
+      const codes = selected();
+      if (!codes.length) { showToast('Select at least one link first', true); return; }
+      if (confirmLabel && !window.confirm(confirmLabel + ' ' + codes.length + ' link' + (codes.length === 1 ? '' : 's') + '? This cannot be undone.')) return;
+      try {
+        const res = await fetch('/api/links/bulk-action', {
+          method: 'POST', headers: authHeaders(), body: JSON.stringify({ action, codes }),
+        });
+        const body = await res.json();
+        if (res.ok) {
+          const nf = body.not_found ? ' · ' + body.not_found + ' not found' : '';
+          showToast('Bulk ' + action + ': ' + body.updated + ' updated' + nf, false, action === 'delete' ? '🗑️' : (action === 'archive' ? '📦' : '↺'));
+          setTimeout(() => location.reload(), 1000);
+        } else showToast((body.error && body.error.message) || ('Failed: ' + res.status), true);
+      } catch { showToast('Network error', true); }
+    }
+    $('#bulkArchiveBtn').addEventListener('click', () => run('archive'));
+    $('#bulkRestoreBtn').addEventListener('click', () => run('restore'));
+    $('#bulkDeleteBtn').addEventListener('click', () => run('delete', 'Permanently delete'));
   })();
 
   /* ---- QR dialog ---- */
   let qrCurrentUrl = '';
   let qrCurrentCode = '';
-  function applyQrSize() {
+  function applyQr() {
     const size = $('#qrSize').value;
-    const src = '/' + encodeURIComponent(qrCurrentCode) + '/qr?format=png&size=' + size;
+    const fg = ($('#qrFg') && $('#qrFg').value || '#111827').replace('#', '');
+    const bg = ($('#qrBg') && $('#qrBg').value || '#ffffff').replace('#', '');
+    const src = '/' + encodeURIComponent(qrCurrentCode) + '/qr?format=png&size=' + size + '&fg=' + fg + '&bg=' + bg;
     $('#qrImg').src = src;
     $('#qrDownload').href = src;
-    $('#qrOpen').href = '/' + encodeURIComponent(qrCurrentCode) + '/qr?format=svg&size=' + size;
+    $('#qrOpen').href = '/' + encodeURIComponent(qrCurrentCode) + '/qr?format=svg&size=' + size + '&fg=' + fg + '&bg=' + bg;
+    const holder = document.querySelector('.qr-holder');
+    if (holder) holder.style.background = '#' + bg;
   }
   function openQr(code, shortUrl) {
     qrCurrentUrl = shortUrl;
@@ -1305,11 +1464,20 @@
     $('#qrDlgTitle').textContent = 'QR · ' + code;
     $('#qrTarget').textContent = shortUrl;
     $('#qrDownload').setAttribute('download', code + '-qr.png');
-    applyQrSize();
+    applyQr();
     qrDlg.showModal();
   }
   $('#qrCopyBtn') && $('#qrCopyBtn').addEventListener('click', () => copyUrl(qrCurrentUrl));
-  $('#qrSize') && $('#qrSize').addEventListener('change', applyQrSize);
+  $('#qrSize') && $('#qrSize').addEventListener('change', applyQr);
+  $('#qrFg') && $('#qrFg').addEventListener('input', applyQr);
+  $('#qrBg') && $('#qrBg').addEventListener('input', applyQr);
+  document.querySelectorAll('.qr-swatch').forEach((sw) => {
+    sw.addEventListener('click', () => {
+      if ($('#qrFg')) $('#qrFg').value = sw.dataset.fg;
+      if ($('#qrBg')) $('#qrBg').value = sw.dataset.bg;
+      applyQr();
+    });
+  });
 
   /* ---- referrer helpers ---- */
   function escapeHtml(s) {

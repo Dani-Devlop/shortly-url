@@ -233,8 +233,13 @@ async def _links_with_counts(
     offset: int = 0,
     with_sparks: bool = True,
     tag: str | None = None,
+    link_status: str = "active",
 ) -> tuple[list[dict], int]:
     stmt = select(Link).order_by(Link.created_at.desc(), Link.id.desc())
+    if link_status == "active":
+        stmt = stmt.where(Link.archived.is_(False))
+    elif link_status == "archived":
+        stmt = stmt.where(Link.archived.is_(True))
     if tag:
         stmt = stmt.where(
             Link.id.in_(select(LinkTag.link_id).where(LinkTag.tag == tag))
@@ -266,6 +271,8 @@ async def _links_with_counts(
             "expiry": _expiry_view(link.expires_at),
             "utm": link.utm_template,
             "tags": _tag_view(link.tags),
+            "archived": link.archived,
+            "archived_rel": _fmt_rel(link.archived_at),
             "sparkline": _sparkline_svg(series.get(link.id, [0] * SPARKLINE_DAYS))
             if with_sparks
             else "",
@@ -285,6 +292,12 @@ async def dashboard(
     per_page: int = Query(default=25, ge=1, le=100),
     bots: bool = Query(default=True, description="Include the 'bot' device class in the Devices panel."),
     tag: str | None = Query(default=None, max_length=32, description="Only show links carrying this tag."),
+    link_status: str = Query(
+        default="active",
+        alias="status",
+        pattern="^(active|archived|all)$",
+        description="Filter the links table by archive state.",
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     if per_page not in PER_PAGE_CHOICES:
@@ -314,6 +327,9 @@ async def dashboard(
         "bots": bots,
         "tag_choices": [],
         "active_tag": active_tag or "",
+        "link_status": link_status,
+        "status_choices": ("active", "archived", "all"),
+        "archived_count": 0,
         "heatmap_days": HEATMAP_DAYS,
         "tag_days": TAG_PANEL_DAYS,
         "tag_rollup": [],
@@ -322,6 +338,10 @@ async def dashboard(
     }
     try:
         link_filter = select(Link)
+        if link_status == "active":
+            link_filter = link_filter.where(Link.archived.is_(False))
+        elif link_status == "archived":
+            link_filter = link_filter.where(Link.archived.is_(True))
         if active_tag:
             link_filter = link_filter.where(
                 Link.id.in_(
@@ -350,7 +370,8 @@ async def dashboard(
 
         base_url = str(request.base_url).rstrip("/")
         entries, _ = await _links_with_counts(
-            db, base_url, limit=per_page, offset=offset, tag=active_tag
+            db, base_url, limit=per_page, offset=offset, tag=active_tag,
+            link_status=link_status,
         )
 
         # Trend chip: this week vs previous week from one 14-day grouped query
@@ -388,6 +409,14 @@ async def dashboard(
             await db.execute(select(LinkTag.tag).distinct().order_by(LinkTag.tag))
         ).scalars().all()
         context["tag_choices"] = list(tag_rows)
+        context["archived_count"] = int(
+            await db.scalar(
+                select(func.count())
+                .select_from(Link)
+                .where(Link.archived.is_(True))
+            )
+            or 0
+        )
 
         # Tag-performance panel + compare-dialog code options.
         rollup_raw = await get_tag_rollup(db, None, days=TAG_PANEL_DAYS)
@@ -417,7 +446,8 @@ async def dashboard(
         )
 
         top_pool, _ = await _links_with_counts(
-            db, base_url, limit=TOP_LINKS_POOL, with_sparks=False
+            db, base_url, limit=TOP_LINKS_POOL, with_sparks=False,
+            link_status="all",
         )
         context["top_links"] = sorted(
             top_pool, key=lambda item: item["clicks"], reverse=True
@@ -533,6 +563,7 @@ async def public_stats_page(
                         "expiry": _expiry_view(link.expires_at),
                         "utm": link.utm_template,
                         "tags": _tag_view(link.tags),
+                        "archived": link.archived,
                     },
                     "total_clicks": total,
                     "unique_clicks": await count_unique_clicks(db, link.id),

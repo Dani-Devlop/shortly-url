@@ -23,6 +23,29 @@ router = APIRouter(tags=["redirect"])
 # Strict allow-list for short codes: blocks traversal/SQLi/XSS payloads up-front.
 CODE_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
 
+_HEX_COLOR_PATTERN = re.compile(r"^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+
+
+def _normalize_hex(value: str, default: str) -> str:
+    """Normalise a validated hex colour query param to ``#rrggbb`` (lowercase)."""
+    match = _HEX_COLOR_PATTERN.match(value.strip())
+    if not match:
+        return default  # Query pattern already 422s invalid shapes; belt-and-braces
+    digits = match.group(1)
+    if len(digits) == 3:
+        digits = "".join(ch * 2 for ch in digits)
+    return f"#{digits.lower()}"
+
+
+def _recolour_svg(svg_text: str, *, fg_hex: str, bg_hex: str) -> str:
+    """Recolour the SvgPathImage output: fill the module path with ``fg_hex``
+    and prepend a background ``<rect>`` in ``bg_hex``."""
+    svg_text = svg_text.replace("<path ", f'<path fill="{fg_hex}" ', 1)
+    vb = re.search(r'viewBox="0 0 ([\d.]+) ([\d.]+)"', svg_text)
+    width, height = (vb.group(1), vb.group(2)) if vb else ("100%", "100%")
+    rect = f'<rect x="0" y="0" width="{width}" height="{height}" fill="{bg_hex}"/>'
+    return svg_text.replace(">", f">{rect}", 1) if ">" in svg_text else svg_text
+
 
 def _client_ip(request: Request) -> str | None:
     forwarded = request.headers.get("x-forwarded-for")
@@ -72,14 +95,28 @@ async def qr_code(
     code: str,
     format: str = Query(default="svg", pattern="^(svg|png)$"),
     size: int = Query(default=256, ge=64, le=1024, description="Image width/height in pixels (SVG and PNG)."),
+    fg: str = Query(
+        default="111827",
+        pattern=r"^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+        description="Module (ink) colour as 3- or 6-digit hex, with or without '#'.",
+    ),
+    bg: str = Query(
+        default="ffffff",
+        pattern=r"^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+        description="Background colour as 3- or 6-digit hex, with or without '#'.",
+    ),
 ) -> Response:
     """QR code pointing at the short URL (public, cacheable).
 
     ``format=svg`` (default) returns vector SVG; ``format=png`` a raster image.
-    ``size`` scales the rendered image (64–1024 px, default 256).
+    ``size`` scales the rendered image (64–1024 px, default 256) and ``fg``/
+    ``bg`` recolour the modules and background (e.g. ``fg=10b981&bg=0f172a``).
     """
     if not CODE_PATTERN.match(code):
         raise NotFoundError(f"Short code '{code}' does not exist")
+
+    fg_hex = _normalize_hex(fg, default="#111827")
+    bg_hex = _normalize_hex(bg, default="#ffffff")
 
     async with get_session_factory()() as db:
         payload, _ = await resolve_target(db, code)
@@ -90,7 +127,11 @@ async def qr_code(
     qr.make(fit=True)
     buffer = io.BytesIO()
     if format == "png":
-        image = qr.make_image(image_factory=qrcode.image.pil.PilImage).get_image()
+        image = qr.make_image(
+            image_factory=qrcode.image.pil.PilImage,
+            fill_color=fg_hex,
+            back_color=bg_hex,
+        ).get_image()
         resized = image.resize((size, size), Image.NEAREST)  # crisp modules, exact pixels
         resized.save(buffer, format="PNG")
         media_type = "image/png"
@@ -104,6 +145,7 @@ async def qr_code(
             svg_text,
             count=1,
         )
+        svg_text = _recolour_svg(svg_text, fg_hex=fg_hex, bg_hex=bg_hex)
         buffer.write(svg_text.encode("utf-8"))
         media_type = "image/svg+xml"
 

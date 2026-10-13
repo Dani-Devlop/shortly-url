@@ -17,6 +17,9 @@ from app.core.security import hash_identifier
 from app.db.session import get_db
 from app.models import Link, LinkTag, User
 from app.schemas.link import (
+    BulkActionItem,
+    BulkActionOut,
+    BulkActionRequest,
     BulkResultItem,
     BulkShortenOut,
     BulkShortenRequest,
@@ -34,6 +37,7 @@ from app.services.link_service import (
     create_link,
     delete_link,
     get_link_by_code,
+    set_archived,
     update_link,
 )
 from app.services.stats_service import (
@@ -64,6 +68,8 @@ def _to_out(link: Link, total_clicks: int) -> LinkOut:
         utm_template=link.utm_template,
         tags=link.tags,
         total_clicks=total_clicks,
+        archived=link.archived,
+        archived_at=link.archived_at,
     )
 
 
@@ -172,7 +178,7 @@ async def export_links_csv(
     writer.writerow(
         [
             "code", "short_url", "original_url", "total_clicks",
-            "created_at", "expires_at", "tags",
+            "created_at", "expires_at", "tags", "archived",
         ]
     )
     for link in rows:
@@ -185,6 +191,7 @@ async def export_links_csv(
                 link.created_at.isoformat() if link.created_at else "",
                 link.expires_at.isoformat() if link.expires_at else "",
                 ";".join(link.tags),
+                "yes" if link.archived else "no",
             ]
         )
     stamp = datetime.now(UTC).strftime("%Y%m%d")
@@ -208,13 +215,26 @@ async def list_links(
         max_length=32,
         description="Only return links carrying this tag (case-insensitive).",
     ),
+    link_status: str = Query(
+        default="active",
+        alias="status",
+        pattern="^(active|archived|all)$",
+        description=(
+            "Filter by archive state: active (default), archived, or all."
+        ),
+    ),
 ) -> LinkPageOut:
     """Paginated list of the authenticated user's links, newest first.
 
-    Returns ``{items, total, limit, offset}`` — ``total`` counts the matching
-    links so clients can compute page counts. Pass ``?tag=`` to filter.
+    Returns ``{items, total, limit, offset, status}`` — ``total`` counts the
+    matching links so clients can compute page counts. Pass ``?tag=`` to
+    filter by tag and ``?status=archived|all`` to include soft-deleted links.
     """
     base = select(Link).where(Link.owner_id == user.id)
+    if link_status == "active":
+        base = base.where(Link.archived.is_(False))
+    elif link_status == "archived":
+        base = base.where(Link.archived.is_(True))
     if tag:
         base = base.where(
             Link.id.in_(
@@ -239,6 +259,7 @@ async def list_links(
         total=total,
         limit=limit,
         offset=offset,
+        status=link_status,
     )
 
 
@@ -248,6 +269,80 @@ async def _owned_link(db: AsyncSession, code: str, user: User) -> Link:
         # 404 (not 403) to avoid leaking the existence of other users' links.
         raise NotFoundError(f"Short code '{code}' does not exist")
     return link
+
+
+async def _apply_bulk_action(
+    db: AsyncSession,
+    user: User,
+    action: str,
+    codes: list[str],
+) -> BulkActionOut:
+    """Shared body of the bulk archive/restore/delete endpoints."""
+    results: list[BulkActionItem] = []
+    updated = 0
+    for code in codes:
+        link = await get_link_by_code(db, code)
+        if link is None or link.owner_id != user.id:
+            results.append(BulkActionItem(code=code, status="not_found"))
+            continue
+        if action == "delete":
+            await delete_link(db, link)
+        else:
+            await set_archived(db, link, archived=(action == "archive"))
+        results.append(BulkActionItem(code=code, status="ok"))
+        updated += 1
+    return BulkActionOut(
+        action=action,
+        updated=updated,
+        not_found=len(results) - updated,
+        results=results,
+    )
+
+
+@router.post("/links/bulk-action", response_model=BulkActionOut)
+async def bulk_action(
+    payload: BulkActionRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> BulkActionOut:
+    """Archive, restore or delete up to 100 links in one call.
+
+    Unknown codes (and codes owned by someone else) are reported per-code as
+    ``not_found`` instead of failing the request; owned codes are processed
+    independently, so a failure never blocks the rest of the batch.
+    """
+    return await _apply_bulk_action(db, user, payload.action, payload.codes)
+
+
+@router.post("/links/{code}/archive", response_model=LinkOut)
+async def archive_link(
+    code: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> LinkOut:
+    """Soft-delete a link: stats stay readable but ``GET /{code}`` returns 410.
+
+    The short URL can be reinstated anytime with :func:`restore_link`.
+    Idempotent — archiving an archived link returns it unchanged.
+    """
+    link = await _owned_link(db, code, user)
+    link = await set_archived(db, link, archived=True)
+    return _to_out(link, await get_total_clicks(db, link))
+
+
+@router.post("/links/{code}/restore", response_model=LinkOut)
+async def restore_link(
+    code: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> LinkOut:
+    """Reinstate an archived link (undo the soft-delete; redirects work again).
+
+    Idempotent — restoring an active link returns it unchanged.
+    """
+    link = await _owned_link(db, code, user)
+    link = await set_archived(db, link, archived=False)
+    return _to_out(link, await get_total_clicks(db, link))
 
 
 @router.get("/links/{code}", response_model=LinkDetailOut)

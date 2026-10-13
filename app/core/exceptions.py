@@ -55,8 +55,13 @@ class GoneError(AppError):
     status_code = 410
     code = "link_expired"
 
-    def __init__(self, message: str = "This short link has expired") -> None:
-        super().__init__(message)
+    def __init__(
+        self,
+        message: str = "This short link has expired",
+        *,
+        code: str | None = None,
+    ) -> None:
+        super().__init__(message, code=code)
 
 
 class ConflictError(AppError):
