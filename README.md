@@ -1,19 +1,58 @@
+<div align="center">
+
 # ⚡ shortly-url
 
-> **Owner:** [Dani-Devlop](https://github.com/Dani-Devlop) · **Profile:** https://github.com/Dani-Devlop
+### Fast, production-ready link shortening with serious click analytics.
 
-A fast, production-ready link shortener with click analytics — **Python 3.12 · FastAPI (async) · PostgreSQL · Redis**, fully dockerized and one-click deployable to [Render](https://render.com).
+**Python 3.12 · FastAPI (async) · PostgreSQL · Redis · React SPA** — fully dockerized, one-click deployable to [Render](https://render.com).
 
-![CI](https://github.com/Dani-Devlop/shortly-url/actions/workflows/ci.yml/badge.svg)
+[![CI](https://github.com/Dani-Devlop/shortly-url/actions/workflows/ci.yml/badge.svg)](https://github.com/Dani-Devlop/shortly-url/actions/workflows/ci.yml)
+[![Web front-end → GitHub Pages](https://github.com/Dani-Devlop/shortly-url/actions/workflows/pages.yml/badge.svg)](https://github.com/Dani-Devlop/shortly-url/actions/workflows/pages.yml)
+![Tests](https://img.shields.io/badge/tests-321%20passing-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.12-informational)
-![FastAPI](https://img.shields.io/badge/FastAPI-async-green)
+![FastAPI](https://img.shields.io/badge/FastAPI-async-success)
+![React](https://img.shields.io/badge/React%20%2B%20Vite-TS%20%2B%20Tailwind-cyan)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
-## 🌐 Live Demo
+[🌐 Live web app](https://dani-devlop.github.io/shortly-url/) · [📖 Interactive docs](https://shortly-url-api.onrender.com/docs) · [📮 Postman collection](./postman_collection.json) · [🚢 Deploy to Render](#-deploy-to-render)
+
+</div>
+
+---
+
+## 📑 Contents
+
+| | | |
+|---|---|---|
+| [Screenshots](#-screenshots) | [Live demo](#-live-demo) | [Feature highlights](#-feature-highlights) |
+| [Web front-end (SPA)](#-web-front-end-spa) | [API reference](#-api-reference) | [Quickstart](#-quickstart) |
+| [Configuration](#%EF%B8%8F-configuration) | [Architecture](#-architecture) | [Deploy to Render](#-deploy-to-render) |
+| [Security notes](#-security-notes) | [License](#-license) | |
+
+## 📸 Screenshots
+
+<div align="center">
+
+**Web dashboard — dark theme** (React SPA, GitHub Pages)
+
+<img src="docs/screenshots/dashboard-dark.png" alt="shortly-url web dashboard — dark theme: link table with tags, sparklines, device bars, tag performance" width="820">
+
+**Per-link analytics** &nbsp;·&nbsp; **QR studio**
+
+<img src="docs/screenshots/analytics-modal.png" alt="Per-link analytics modal: totals, daily clicks chart, device mix, traffic sources" width="49%">&nbsp;
+<img src="docs/screenshots/qr-studio.png" alt="QR studio: SVG/PNG formats, size, colour presets and pickers" width="49%">
+
+**Fully responsive down to 390 px**
+
+<img src="docs/screenshots/mobile.png" alt="Mobile view of the dashboard" width="30%">
+
+</div>
+
+## 🌐 Live demo
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Dani-Devlop/shortly-url)
 
-> **⚠️ Heads-up:** Render hosts this demo on **your** Render account, so the URLs below only
+> **⚠️ Heads-up:** Render hosts this demo on **your** Render account, so the API URLs below only
 > answer **after** you apply the blueprint with the one-click button above (~2 minutes,
 > zero configuration — `render.yaml` pre-wires the API, PostgreSQL and Redis together and
 > sets `BASE_URL`, `MASTER_API_KEY` and `IP_HASH_SALT` for you).
@@ -29,97 +68,150 @@ Once deployed:
 | Interactive docs (Swagger) | https://shortly-url-api.onrender.com/docs |
 | Health probe | https://shortly-url-api.onrender.com/health |
 
-## 🖥 Web front-end
+> **🔑 Demo API key:** `shortly-demo-key-2024` — pre-set in `render.yaml` as the
+> `MASTER_API_KEY` so the demo works out of the box. Rotate it for any serious use.
+> Free Render instances sleep when idle — the first request may take ~30 s to wake up.
 
-`frontend/` holds a **React 18 + Vite + TypeScript + Tailwind CSS 4** single-page app that talks to the API over CORS using your `X-API-Key` (the key is stored only in your browser's localStorage):
+## ✨ Feature highlights
+
+### 🔗 Core shortening
+
+- **Shorten** any `http(s)` URL — auto-generated 7-char codes or validated custom aliases (`4–16` chars)
+- **Bulk shorten** — `POST /api/shorten/bulk` creates up to 25 links per call with per-item `created` / `duplicate` / `error` results
+- **Redis-cached redirects** — cache-aside layer over a PostgreSQL source of truth, `X-Cache: HIT|MISS` on every redirect
+- **Query-param forwarding** — `/abc?utm_source=twitter` appends the params to the destination (incoming params win; destination UTMs preserved; fragment-safe)
+- **UTM campaign templates** — store default UTM params per link (`utm_template`), applied on every redirect with clear precedence: explicit short-URL params > destination params > template (validated & normalised, 512-char cap)
+
+### 📊 Click analytics
+
+- **Totals & unique visitors** — total + distinct (`ip_hash`) clicks per link and across all links
+- **Daily aggregation** — rolling windows of 1–90 days, zero-filled series (charts never lie about gaps)
+- **Device analytics** — every click classified (`desktop | mobile | tablet | bot | other`); per-link breakdown or global mix in a window, with a **🤖 bots toggle** to drop crawler traffic
+- **Referrers × device cross-tab** — top traffic sources in a rolling window, each item carrying clicks per device class for stacked bars
+- **7×24 click-hour heatmap** — weekday × hour (UTC) grid with `total` + `peak` over a rolling window
+- **Sparklines** — zero-filled daily click series per link, powering per-row trend charts
+- **Tag rollups** — clicks / links / unique visitors aggregated per tag, zero-click tags included
+- **Link comparison** — two links' totals, uniques and daily series side by side in one grouped query
+- **Live activity feed** — the newest clicks across all links (device class, referrer host, truncated IP hash)
+- **CSV exports** — all links, a single link's individual clicks, and the tag rollup
+
+### 🗂 Link lifecycle
+
+- **Edit anything** — `PATCH /api/links/{code}` repoints the destination, sets/clears expiry, UTM template or tags (cache-invalidated)
+- **Link expiry** — expired codes answer `410 Gone` (enforced on both cache and DB paths; clicks no longer recorded)
+- **Archive / restore (soft delete)** — stash a link without losing its history: redirects answer `410 Gone` (`error.code: link_archived`) while stats stay readable; both idempotent and cache-invalidated
+- **Bulk actions** — archive / restore / delete up to 100 links per call with per-code `ok` / `not_found` results (unknown or foreign codes never fail the batch)
+- **Paginated listing** — `GET /api/links` with `{items, total, limit, offset, status}`, filter by tag and by `active | archived | all`
+
+### 🏷 Tags
+
+- Up to **6 tags per link** (normalised: trimmed, lowercased, spaces → `-`, 2–24 chars)
+- **Filter the list** with `GET /api/links?tag=docs`
+- **Rename / merge** with `POST /api/tags/rename` (target duplicates merge, tag caps can never break) and **strip everywhere** with `DELETE /api/tags/{tag}` — both owner-scoped
+- Colored per-tag chips (deterministic hue) in both dashboards, tag filter dropdown, tags column in CSV exports
+
+### 🌍 Public & shareable
+
+- **Public stats page** — `GET /s/{code}`: a shareable, no-auth HTML page per link with total/unique clicks, 14-day bar chart, device mix, top sources, recent clicks (referrer hosts only — **IP hashes are never shown**) and a QR code; styled 404 for unknown codes; `?bots=0` switches the click-derived panels to human-only traffic while hero totals stay truthful
+- **QR codes** — `GET /{code}/qr`: SVG (default) or PNG, `?size=64–1024` px, recolourable with `?fg=` / `?bg=` hex params; public and cacheable
+
+### 🛡 Privacy & resilience
+
+- **IP privacy** — visitor IPs are salted & SHA-256 hashed before storage (truncated in UI and exports)
+- **Per-key rate limiting** on `POST /api/shorten` (Redis fixed window, weighted cost for bulk calls, fails open if Redis is down) with `X-RateLimit-Limit` / `-Remaining` / `-Reset` headers and `Retry-After` on `429`
+- **Graceful degradation** — Redis down → falls back to DB-only mode; DB down → clean `503/500` JSON errors
+- **Structured errors** — every failure is `{"error": {"code": "...", "message": "..."}}`
+
+### 🖥 Server-rendered dashboard (v11, ships with the API)
+
+- Dark/light theme toggle (persisted), animated summary cards with tinted icon badges and a **weekly trend chip (▲▼ vs prev 7d)**
+- Per-link 7-day sparklines, expiry badges, UTM campaign chips, colored #tag chips (click to filter) + tag filter dropdown
+- Segmented status pills (Active / Archived (n) / All) that preserve sort/tag/page params
+- **Bulk-select column + floating bulk-action bar**, per-row archive/restore with hatched archived rows, **undo toasts that survive page reloads**
+- Keyboard shortcuts: `/` focuses the filter, `n` jumps to the create form
+- Insights modal: 14-day mini bar chart, 7×24 heatmap, traffic-source bars stacked by device, device breakdown + chips per click, unique visitors
+- **⚖️ Compare dialog** (dual sparklines + verdict), **QR dialog** (size 128–1024 px + ink/background pickers + 6 presets), admin **tag manager** (rename/merge/delete)
+- Sticky actions column, hover accent bars, focus-visible rings, client-side filter with empty state, server-side pagination with page-size control, auto-refresh toggle (30 s, pauses while dialogs are open), quick API reference panel, bulk create, CSV downloads
+- API key stays in your browser's sessionStorage
+
+## 🖥 Web front-end (SPA)
+
+`frontend/` holds a **React 18 + Vite + TypeScript + Tailwind CSS 4** single-page app that talks to the API over CORS using your `X-API-Key` (stored only in your browser's localStorage):
 
 - **Connect screen** — point the app at any shortly-url deployment (defaults to the Render demo), validate the key, see live health (db/redis/version)
 - **Dashboard** — stats strip, status pills (active/archived/all), server-side tag filter + pagination, client-side search, sortable click badges
 - **Link management** — create (URL, custom alias, tags, expiry, UTM template), edit, archive/restore with **undo toasts**, bulk select → archive/restore/delete, delete confirmation
-- **Analytics per link** — daily clicks area chart, device mix, referrer × device stacked sources, 7×24 click-hour heatmap, recent clicks feed, window selector (7/14/30/90d), CSV export
+- **Analytics per link** — daily clicks area chart, device mix, referrer × device stacked sources, 7×24 click-hour heatmap, recent clicks feed, window selector (7/14/30/90 d), CSV export
 - **Global panels** — 14-day sparklines per link, device breakdown (humans-only toggle), tag performance bars with CSV, live activity feed
-- **Extras** — compare two links (dual chart + verdict), QR studio (SVG/PNG, size, colour presets + pickers), keyboard shortcuts (`n` new link, `/` search), dark/light theme, fully responsive down to 390px
+- **Extras** — compare two links (dual chart + verdict), QR studio (SVG/PNG, size, colour presets + pickers), keyboard shortcuts (`n` new link, `/` search), dark/light theme, fully responsive down to 390 px
 
-Hand-rolled SVG charts (no chart library) keep the whole bundle at ~63 KB gzipped.
+Hand-rolled SVG charts (no chart library) keep the whole bundle at **~63 KB gzipped**.
 
-**Deployment:** every push to `main` builds the SPA via [.github/workflows/pages.yml](./.github/workflows/pages.yml) and publishes it to **GitHub Pages** → https://dani-devlop.github.io/shortly-url/ (Pages must be set to *GitHub Actions* source — already configured). Local development: `cd frontend && npm install && npm run dev` (set the API URL in the connect screen, e.g. `http://localhost:8000`).
+**Deployment:** every push to `main` builds the SPA via [`.github/workflows/pages.yml`](./.github/workflows/pages.yml) and publishes it to **GitHub Pages** → <https://dani-devlop.github.io/shortly-url/> (Pages must be set to *GitHub Actions* source — already configured).
 
-**Demo API key:** `shortly-demo-key-2024` — pre-set in `render.yaml` as the `MASTER_API_KEY` so the demo works out of the box. Rotate it for any serious use.
+**Local development:**
 
-Free Render instances sleep when idle — the first request may take ~30s to wake up.
+```bash
+cd frontend && npm install && npm run dev
+# then set the API URL in the connect screen, e.g. http://localhost:8000
+```
 
-## 📦 Postman Collection
+## 🔌 API reference
 
-Import [`postman_collection.json`](./postman_collection.json) directly into Postman (File → Import), or use the raw URL:
-https://github.com/Dani-Devlop/shortly-url/blob/main/postman_collection.json
+All authenticated endpoints expect your key in the `X-API-Key` header. Errors are always structured: `{"error": {"code": "...", "message": "..."}}`.
 
-The collection ships with variables `baseUrl` and `apiKey` and covers every endpoint, including the redirect flow.
+### Shortening & link management
 
-## ✨ Features
-
-- **Shorten** any `http(s)` URL — auto-generated 7-char codes or validated custom aliases (`4–16` chars)
-- **Tags** — organise links with up to 6 tags per link (`tags` on create/PATCH, normalised: trimmed, lowercased, spaces → `-`, 2–24 chars); filter the list with `GET /api/links?tag=docs`; the dashboard renders per-tag **colored chips** (deterministic hue per tag), a tag filter dropdown, and the client filter matches tags too; links CSV export gains a `tags` column
-- **Tag analytics & management** — `GET /api/stats/tags?days=30` rolls clicks/links/unique visitors up per tag (zero-click tags included); CSV rollup at `/api/stats/tags/export`; rename/merge with `POST /api/tags/rename` (target duplicates merge, tag caps can never break) and strip everywhere with `DELETE /api/tags/{tag}` — both owner-scoped and surfaced in the dashboard's **🏷 Tag performance panel** (ranked hue-colored bars) and the admin **tag manager** (rename/delete UI)
-- **Redirects** served from a Redis cache-aside layer with a PostgreSQL source of truth (`X-Cache: HIT|MISS` header on every redirect)
-- **Update destinations & expiry** — `PATCH /api/links/{code}` repoints a code and/or sets/clears `expires_at`, invalidating its cache entry
-- **Link expiry** — set `expires_at` on creation or via `PATCH`; expired codes answer `410 Gone` (enforced on cache and DB paths; clicks are no longer recorded)
-- **Link archival (soft delete)** — `POST /api/links/{code}/archive` stashes a link without losing its history: redirects answer `410 Gone` (`error.code: link_archived`, enforced on cache and DB paths) while stats stay readable; `POST /api/links/{code}/restore` brings it back; both idempotent and cache-invalidated; filter lists with `GET /api/links?status=active|archived|all`; the CSV export gains an `archived` column; the public stats page shows a 📦 archived badge
-- **Bulk actions** — `POST /api/links/bulk-action` archives/restores/deletes up to 100 links per call with per-code `ok` / `not_found` results (unknown or foreign codes never fail the batch); surfaced in the dashboard as a bulk-select column with a floating action bar
-- **Bulk shorten** — `POST /api/shorten/bulk` creates up to 25 links per call with per-item results
-- **CSV export** — download your links (`/api/links/export`) or every individual click of a link (`/api/stats/{code}/export`)
-- **Sparklines** — `GET /api/stats/sparklines` returns zero-filled daily click series (powering the dashboard's per-link trend charts)
-- **Click-hour heatmap** — `GET /api/stats/{code}/hours?days=30` returns a zero-filled 7×24 (weekday × hour, UTC) grid with `total` + `peak`; rendered in the dashboard's insights modal and as a server-rendered **“When · last 30 days” panel on the public stats page** (aggregate only — privacy-safe)
-- **Click analytics** — total clicks, daily aggregation, the 20 most recent clicks per link, and **referrer (traffic source) tracking** with a top-5 sources breakdown; recorded asynchronously via background tasks (zero redirect latency impact)
-- **Unique visitors** — `unique_clicks` (distinct `ip_hash`) on `GET /api/stats/{code}`, link detail, and a **Unique visitors** summary card on the dashboard
-- **Query-param forwarding** — `/abc?utm_source=twitter` redirects to the destination with `utm_source=twitter` appended (incoming params win; destination UTMs preserved; fragment-safe)
-- **UTM campaign templates** — store default UTM params per link (`utm_template` on create/PATCH, e.g. `utm_source=newsletter&utm_campaign=launch`); applied on every redirect with clear precedence: explicit short-URL params > destination params > template (validated & normalised, 512-char cap)
-- **Public stats page** — `GET /s/{code}` is a shareable, no-auth HTML page per link: total/unique clicks, 14-day bar chart, device mix, top sources, recent clicks (referrer hosts only — **IP hashes are never shown**) and a QR code; styled 404 for unknown codes; linked from every dashboard row via the ↗ share action; **🤖 bots toggle** — append `?bots=0` to switch the click-derived panels (devices / when / sources / recent) to human traffic only while the hero totals stay truthful all-click numbers
-- **QR codes** at `GET /{code}/qr` — SVG (default) or PNG (`?format=png`), `?size=64–1024` px variants (default 256), **recolourable with `?fg=` / `?bg=` hex params** (3- or 6-digit, `#` optional — e.g. `fg=34d399&bg=0f172a`), public and cacheable
-- **Bot filtering** — `GET /api/stats/devices?days=7&exclude_bots=true` drops crawler traffic; the dashboard's devices panel has a 🤖 one-click bots toggle (`?bots=0`)
-- **Global activity feed** — `GET /api/stats/activity?limit=20` streams the owner's newest clicks across all links (device class, referrer host, truncated IP hash) and powers the dashboard's **🛰 Live activity panel**, which live-polls every 10 s while admin is unlocked
-- **Device analytics** — every click is classified (from the user agent) as `desktop | mobile | tablet | bot | other`; get the mix per link (`device_breakdown` in link detail) or across all your links in a rolling window (`GET /api/stats/devices?days=7`); the dashboard shows a live stacked device bar
-- **Windowed referrers with device cross-tab** — `GET /api/stats/{code}/referrers?days=7&limit=10` ranks traffic sources inside a 1–90 day rolling window (`total` counts the whole window even beyond `limit`); each item carries a **`devices` cross-tab** (clicks per device class for that source, one grouped query) so clients can render stacked bars; the dashboard's insights modal draws each source bar stacked by device and the link detail's `top_referrers` exposes the same cross-tab all-time
-- **Paginated link listing** — `GET /api/links?limit=20&offset=0&status=active|archived|all` returns `{items, total, limit, offset, status}`
-- **Link comparison** — `GET /api/stats/compare?codes=a,b&days=14` returns two links' totals, unique visitors and zero-filled daily series side by side (one grouped query); the dashboard toolbar's **⚖️ Compare button** opens a dialog that renders dual sparkline cards, winner highlighting and a plain-language verdict
-- **Interactive dashboard v11** at `/` — dark/light theme toggle (persisted), animated summary cards with **tinted icon badges** and a **weekly trend chip (▲▼ vs prev 7d)**, per-link 7-day sparklines, expiry badges, **📣 UTM campaign chips per row**, **colored #tag chips per row** (click a chip to filter) + **tag filter dropdown**, **segmented status pills (Active / Archived (n) / All) that preserve sort/tag/page params**, **bulk-select column + floating bulk-action bar (archive/restore/delete)**, per-row **archive/restore action** with hatched + struck-through archived rows, **undo toasts** (archive/restore/bulk actions show an Undo button that survives the page reload), **keyboard shortcuts (`/` focuses the filter, `n` jumps to the create form)**, **devices panel with stacked mix bar + bots toggle**, **🏷 tag-performance panel (ranked bars, hue per tag)**, **🛰 live activity feed (server-rendered + 10 s live-poll)**, insights modal with a **14-day mini bar chart** + **7×24 click-hour heatmap** + **traffic-source bars stacked by device class + device breakdown + device chips per click + unique visitors**, **⚖️ compare dialog (dual sparklines + verdict)**, client-side table filter (matches code/URL/tags) with a **no-matches empty state**, row **hover accent bars** and **focus-visible rings**, sticky **actions column that never clips** (horizontal-scroll friendly), server-side pagination with page-size control, **auto-refresh toggle (30s, pauses while dialogs are open)**, centered animated dialogs, inline QR dialog (**size selector 128–1024 px + ink/background colour pickers + 6 presets**), quick API reference panel, bulk create, **custom-alias + tags fields on create**, CSV downloads (links, per-link clicks, tags rollup), admin **tag manager (rename/merge/delete)**, and create/edit/archive/delete actions — create & edit dialogs manage destination, expiry, **tags** and the UTM template (API key stays in your browser's sessionStorage)
-- **Per-key rate limiting** on `POST /api/shorten` (Redis fixed window, weighted cost for bulk calls, fails open if Redis is down) with **observability headers**: `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset` on success and `Retry-After` on `429`
-- **IP privacy** — visitor IPs are salted & SHA-256 hashed before storage (truncated in UI and exports)
-- **Graceful degradation** — Redis down → falls back to DB; DB down → clean `503/500` JSON errors
-- **Interactive docs** at `/docs`, health probe at `/health`, HTML dashboard at `/`
-
-## 🔌 API Overview
-
-| Method | Path | Auth (`X-API-Key`) | Description |
-|---|---|---|---|
+| Method | Path | Auth | Description |
+|---|---|:-:|---|
 | `POST` | `/api/shorten` | ✅ | Create a short link. Body: `{"url": "...", "custom_code": null, "expires_at": null, "utm_template": "utm_source=...", "tags": ["docs"]}` |
 | `POST` | `/api/shorten/bulk` | ✅ | Shorten 1–25 URLs in one call — per-item `created` / `duplicate` / `error` results |
-| `GET` | `/{code}` | — | `302` redirect (click recorded in background, `X-Cache: HIT\|MISS`, `410 Gone` when expired; query params forwarded + link's UTM template applied) |
-| `GET` | `/{code}/qr` | — | QR code for the short URL — `?format=svg` (default) or `?format=png`, `?size=64–1024` px (default 256), recolourable `?fg=34d399&bg=0f172a` (3/6-digit hex, `#` optional; cacheable, public) |
-| `GET` | `/s/{code}` | — | **Public stats page** (shareable HTML) — total/unique clicks, 14-day chart, devices, top sources, recent clicks, QR — no API key; `?bots=0` = human-only panels |
-| `GET` | `/api/stats/{code}` | ✅ | Total + unique clicks for a link |
-| `GET` | `/api/stats/{code}/daily?days=14` | ✅ | Daily aggregated clicks (1–90 day window) |
-| `GET` | `/api/stats/sparklines?days=7` | ✅ | Zero-filled per-link daily click series (1–30 days, up to 200 links) |
-| `GET` | `/api/stats/devices?days=7` | ✅ | Device mix (`desktop/mobile/tablet/bot/other`) across your links in a rolling window (1–90 days); `&exclude_bots=true` drops crawlers |
-| `GET` | `/api/stats/tags?days=30` | ✅ | Click rollup per tag across your links — `{tag, links, clicks, unique_visitors}` ranked by clicks (zero-click tags included); CSV: `/api/stats/tags/export` |
-| `GET` | `/api/stats/compare?codes=a,b&days=14` | ✅ | Compare exactly two of your links — per-code totals, unique visitors and a zero-filled daily series (request order preserved) |
-| `POST` | `/api/tags/rename` | ✅ | Rename a tag across all your links — body `{"from": "old", "to": "new"}`; links already carrying the target are merged |
-| `GET` | `/api/stats/activity?limit=20` | ✅ | Newest clicks across all your links (code, device, referrer host, truncated IP hash) — newest first |
-| `GET` | `/api/stats/{code}/referrers?days=7&limit=10` | ✅ | Top traffic sources for a link within a rolling window (1–90 days); each item carries a `devices` cross-tab (clicks per device class for that source) |
-| `GET` | `/api/stats/{code}/hours?days=30` | ✅ | Zero-filled 7×24 heatmap (weekday × hour, UTC) over a rolling window (1–90 days) — `{cells, total, peak}` |
-| `GET` | `/api/stats/{code}/export` | ✅ | CSV download of a link's individual clicks (truncated IP hashes, referrer + device columns) |
-| `GET` | `/api/links?limit=20&offset=0` | ✅ | Paginated list of the user's links — `{items, total, limit, offset, status}` (limit 1–100); `&tag=docs` filters by tag, `&status=archived\|all` by archive state |
-| `GET` | `/api/links/export` | ✅ | CSV download of all the user's links (click counts included) |
-| `GET` | `/api/links/{code}` | ✅ | Link detail incl. the 20 most recent clicks (hashed IP prefix, user agent, referrer, device) + all-time top-5 traffic sources + device breakdown + unique clicks + zero-filled 14-day daily series (`daily_14d`) + tags |
-| `PATCH` | `/api/links/{code}` | ✅ | Update destination, expiry, UTM template and/or tags — `{"url": "...", "expires_at": null, "utm_template": "...", "tags": ["new"]}` (null clears the field; `tags` replaces the whole set, `[]` clears all) |
+| `GET` | `/api/links` | ✅ | Paginated list — `{items, total, limit, offset, status}` (limit 1–100); `&tag=docs` filters by tag, `&status=archived\|all` by archive state |
+| `GET` | `/api/links/{code}` | ✅ | Link detail: 20 most recent clicks (hashed IP prefix, user agent, referrer, device), all-time top-5 traffic sources + device cross-tab, device breakdown, unique clicks, zero-filled 14-day series (`daily_14d`), tags |
+| `GET` | `/api/links/export` | ✅ | CSV download of all your links (click counts + tags + archived included) |
+| `PATCH` | `/api/links/{code}` | ✅ | Update destination, expiry, UTM template and/or tags (null clears the field; `tags` replaces the whole set, `[]` clears all) |
 | `DELETE` | `/api/links/{code}` | ✅ | Delete a link (cascades click rows, invalidates cache) |
 | `POST` | `/api/links/{code}/archive` | ✅ | Soft-delete: stats stay readable, `GET /{code}` answers `410 Gone` (`link_archived`) until restore — idempotent |
 | `POST` | `/api/links/{code}/restore` | ✅ | Undo the archive — redirects work again (idempotent) |
-| `POST` | `/api/links/bulk-action` | ✅ | Archive / restore / delete up to 100 links — body `{"action": "archive\|restore\|delete", "codes": ["..."]}`; per-code `ok`/`not_found` results |
+| `POST` | `/api/links/bulk-action` | ✅ | Archive / restore / delete up to 100 links — `{"action": "archive\|restore\|delete", "codes": ["..."]}`; per-code `ok`/`not_found` results |
+
+### Redirects & public pages
+
+| Method | Path | Auth | Description |
+|---|---|:-:|---|
+| `GET` | `/{code}` | — | `302` redirect (click recorded in background, `X-Cache: HIT\|MISS`, `410 Gone` when expired or archived; query params forwarded + link's UTM template applied) |
+| `GET` | `/{code}/qr` | — | QR code for the short URL — `?format=svg` (default) or `?format=png`, `?size=64–1024` px (default 256), recolourable `?fg=34d399&bg=0f172a` (3/6-digit hex, `#` optional; cacheable, public) |
+| `GET` | `/s/{code}` | — | **Public stats page** (shareable HTML) — total/unique clicks, 14-day chart, devices, top sources, recent clicks, QR — no API key; `?bots=0` = human-only panels |
+
+### Click analytics
+
+| Method | Path | Auth | Description |
+|---|---|:-:|---|
+| `GET` | `/api/stats/{code}` | ✅ | Total + unique clicks for a link |
+| `GET` | `/api/stats/{code}/daily?days=14` | ✅ | Daily aggregated clicks (1–90 day window) |
+| `GET` | `/api/stats/{code}/referrers?days=7&limit=10` | ✅ | Top traffic sources within a rolling window (1–90 days); each item carries a `devices` cross-tab (clicks per device class for that source) |
+| `GET` | `/api/stats/{code}/hours?days=30` | ✅ | Zero-filled 7×24 heatmap (weekday × hour, UTC) — `{cells, total, peak}` |
+| `GET` | `/api/stats/{code}/export` | ✅ | CSV download of a link's individual clicks (truncated IP hashes, referrer + device columns) |
+| `GET` | `/api/stats/sparklines?days=7` | ✅ | Zero-filled per-link daily click series (1–30 days, up to 200 links) |
+| `GET` | `/api/stats/devices?days=7` | ✅ | Device mix across your links in a rolling window (1–90 days); `&exclude_bots=true` drops crawlers |
+| `GET` | `/api/stats/activity?limit=20` | ✅ | Newest clicks across all your links (code, device, referrer host, truncated IP hash) — newest first |
+| `GET` | `/api/stats/compare?codes=a,b&days=14` | ✅ | Compare exactly two of your links — per-code totals, unique visitors and a zero-filled daily series (request order preserved) |
+
+### Tags
+
+| Method | Path | Auth | Description |
+|---|---|:-:|---|
+| `GET` | `/api/stats/tags?days=30` | ✅ | Click rollup per tag — `{tag, links, clicks, unique_visitors}` ranked by clicks (zero-click tags included) |
+| `GET` | `/api/stats/tags/export` | ✅ | CSV download of the tag rollup |
+| `POST` | `/api/tags/rename` | ✅ | Rename a tag across all your links — `{"from": "old", "to": "new"}`; links already carrying the target are merged |
 | `DELETE` | `/api/tags/{tag}` | ✅ | Strip a tag from every one of your links (links are kept) |
+
+### System
+
+| Method | Path | Auth | Description |
+|---|---|:-:|---|
 | `GET` | `/health` | — | DB/Redis health probe (`503` when DB is down) |
 | `GET` | `/docs` | — | Interactive Swagger docs |
-
-Errors are always structured: `{"error": {"code": "...", "message": "..."}}`.
 
 ### Quick example
 
@@ -134,7 +226,9 @@ curl -i http://localhost:8000/aB3xK9m        # → 302 + Location, click counted
 curl -H "X-API-Key: change-me-master-key" http://localhost:8000/api/stats/aB3xK9m
 ```
 
-## 🚀 Quickstart (Docker)
+## 🚀 Quickstart
+
+### Docker (recommended)
 
 ```bash
 git clone https://github.com/Dani-Devlop/shortly-url.git
@@ -142,10 +236,10 @@ cd shortly-url
 docker compose up --build
 ```
 
-Open http://localhost:8000 — the API runs with PostgreSQL 16 + Redis 7, migrations applied automatically.
-Configure `MASTER_API_KEY` / `IP_HASH_SALT` via a `.env` file (see `.env.example`).
+Open <http://localhost:8000> — the API runs with PostgreSQL 16 + Redis 7, migrations applied automatically.
+Configure `MASTER_API_KEY` / `IP_HASH_SALT` via a `.env` file (see [`.env.example`](./.env.example)).
 
-## 🛠 Local Development (no Docker)
+### Local development (no Docker)
 
 ```bash
 python3.12 -m venv .venv && source .venv/bin/activate
@@ -162,7 +256,7 @@ uvicorn app.main:app --reload
 
 Run migrations against a real database with `alembic upgrade head`.
 
-## 🧪 Tests
+### Tests
 
 ```bash
 pytest -v          # 321 tests, async SQLite + fakeredis, no services needed
@@ -170,7 +264,7 @@ ruff check .       # lint
 python scripts/load_test.py --base http://localhost:8000 --code <code> --total 1000 --concurrency 50
 ```
 
-## ⚙️ Environment Variables
+## ⚙️ Configuration
 
 | Variable | Default | Description |
 |---|---|---|
@@ -199,12 +293,23 @@ app/
 ├── db/                # async engine/session, declarative base, bootstrap
 └── templates/         # Jinja2 dashboard + public stats page
 alembic/               # migrations 0001–0005 (alembic upgrade head)
+frontend/              # React 18 + Vite + TS + Tailwind 4 SPA (GitHub Pages)
 tests/                 # pytest + pytest-asyncio suite (async SQLite, fakeredis)
 ```
 
-**Redirect flow:** `GET /{code}` → Redis cache lookup → (miss) PostgreSQL fetch + cache fill → `302` response → background task records the `clicks` row and increments the Redis counter. Deleting a link invalidates its cache entry, so deleted codes 404 immediately.
+**Redirect flow:**
 
-## 🚢 Deployment on Render
+```mermaid
+flowchart LR
+    A["GET /{code}"] --> B{"Redis<br/>cache"}
+    B -- HIT --> E["302 redirect"]
+    B -- MISS --> C["PostgreSQL<br/>lookup"] --> D["cache fill"] --> E
+    E --> F["background task<br/>records click + counter"]
+```
+
+Deleting a link invalidates its cache entry, so deleted codes 404 immediately.
+
+## 🚢 Deploy to Render
 
 **One-click (recommended):** click the **Deploy to Render** button at the top of this README, review the blueprint summary, and hit **Apply**. Render then:
 
@@ -215,7 +320,7 @@ tests/                 # pytest + pytest-asyncio suite (async SQLite, fakeredis)
 
 **Manual alternative:** Render dashboard → **New → Blueprint** → select `Dani-Devlop/shortly-url` → **Apply** (same result).
 
-**Auto-deploys:** `autoDeploy: true` redeploys on every push to `main`. Optionally add a `RENDER_DEPLOY_HOOK_URL` repo secret and `.github/workflows/deploy.yml` will also trigger a deploy on each push.
+**Auto-deploys:** `autoDeploy: true` redeploys on every push to `main`. Optionally add a `RENDER_DEPLOY_HOOK_URL` repo secret and [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml) will also trigger a deploy on each push.
 
 **Troubleshooting:**
 
@@ -227,7 +332,7 @@ tests/                 # pytest + pytest-asyncio suite (async SQLite, fakeredis)
 | Deploys succeeded before, now DB errors | Render **free PostgreSQL expires after 30 days** | Upgrade the database plan, or delete & recreate it — migrations re-run automatically on the fresh DB |
 | Blueprint apply complains about existing resources | A previous partial apply left resources behind | Delete the stale `shortly-url-*` resources in the dashboard, then re-apply |
 
-## 🔒 Security Notes
+## 🔒 Security notes
 
 - Parameterized queries everywhere (SQLAlchemy Core/ORM) — no string-built SQL
 - Strict allow-lists: URL scheme (`http/https`), custom alias charset, short-code format
@@ -238,3 +343,11 @@ tests/                 # pytest + pytest-asyncio suite (async SQLite, fakeredis)
 ## 📄 License
 
 MIT — see [LICENSE](./LICENSE).
+
+---
+
+<div align="center">
+
+**⚡ shortly-url** · built by [Dani-Devlop](https://github.com/Dani-Devlop) · [⬆ back to top](#-shortly-url)
+
+</div>
