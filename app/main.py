@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -44,6 +45,17 @@ def create_app() -> FastAPI:
         description="Fast link shortener with click analytics.",
         version=__version__,
         lifespan=lifespan,
+    )
+
+    # The bundled SPA front-end (GitHub Pages / any static host) lives on a
+    # different origin. It authenticates with the X-API-Key request header —
+    # never cookies — so a wide CORS policy is safe here.
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["X-Cache"],
     )
 
     # Order matters: the catch-all /{code} redirect route must be registered LAST.
