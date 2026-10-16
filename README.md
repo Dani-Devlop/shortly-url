@@ -23,10 +23,26 @@ Once deployed:
 
 | What | URL |
 |---|---|
+| Web app (SPA dashboard) | https://dani-devlop.github.io/shortly-url/ |
 | API | https://shortly-url-api.onrender.com |
-| Dashboard (links + click counts) | https://shortly-url-api.onrender.com/ |
+| Dashboard (server-rendered) | https://shortly-url-api.onrender.com/ |
 | Interactive docs (Swagger) | https://shortly-url-api.onrender.com/docs |
 | Health probe | https://shortly-url-api.onrender.com/health |
+
+## 🖥 Web front-end
+
+`frontend/` holds a **React 18 + Vite + TypeScript + Tailwind CSS 4** single-page app that talks to the API over CORS using your `X-API-Key` (the key is stored only in your browser's localStorage):
+
+- **Connect screen** — point the app at any shortly-url deployment (defaults to the Render demo), validate the key, see live health (db/redis/version)
+- **Dashboard** — stats strip, status pills (active/archived/all), server-side tag filter + pagination, client-side search, sortable click badges
+- **Link management** — create (URL, custom alias, tags, expiry, UTM template), edit, archive/restore with **undo toasts**, bulk select → archive/restore/delete, delete confirmation
+- **Analytics per link** — daily clicks area chart, device mix, referrer × device stacked sources, 7×24 click-hour heatmap, recent clicks feed, window selector (7/14/30/90d), CSV export
+- **Global panels** — 14-day sparklines per link, device breakdown (humans-only toggle), tag performance bars with CSV, live activity feed
+- **Extras** — compare two links (dual chart + verdict), QR studio (SVG/PNG, size, colour presets + pickers), keyboard shortcuts (`n` new link, `/` search), dark/light theme, fully responsive down to 390px
+
+Hand-rolled SVG charts (no chart library) keep the whole bundle at ~63 KB gzipped.
+
+**Deployment:** every push to `main` builds the SPA via [.github/workflows/pages.yml](./.github/workflows/pages.yml) and publishes it to **GitHub Pages** → https://dani-devlop.github.io/shortly-url/ (Pages must be set to *GitHub Actions* source — already configured). Local development: `cd frontend && npm install && npm run dev` (set the API URL in the connect screen, e.g. `http://localhost:8000`).
 
 **Demo API key:** `shortly-demo-key-2024` — pre-set in `render.yaml` as the `MASTER_API_KEY` so the demo works out of the box. Rotate it for any serious use.
 
@@ -149,7 +165,7 @@ Run migrations against a real database with `alembic upgrade head`.
 ## 🧪 Tests
 
 ```bash
-pytest -v          # 318 tests, async SQLite + fakeredis, no services needed
+pytest -v          # 321 tests, async SQLite + fakeredis, no services needed
 ruff check .       # lint
 python scripts/load_test.py --base http://localhost:8000 --code <code> --total 1000 --concurrency 50
 ```
