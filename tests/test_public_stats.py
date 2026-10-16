@@ -125,14 +125,16 @@ async def test_public_stats_page_heatmap_and_tags(client: AsyncClient, db_engine
         client, url="https://example.com/heatmap-public", tags=["Marketing", "Docs"]
     )
     now = datetime.now(UTC)
-    # Both clicks land in the SAME (weekday, hour) cell → peak = 2.
+    # Anchor both clicks mid-hour so they always share one (weekday, hour) cell,
+    # even when the test itself runs across an hour boundary → peak = 2, always.
+    anchor = now.replace(minute=30, second=0, microsecond=0) - timedelta(hours=2)
     await _seed_click(
         client, data["id"], factory,
-        clicked_at=now - timedelta(hours=2),
+        clicked_at=anchor,
     )
     await _seed_click(
         client, data["id"], factory,
-        clicked_at=now - timedelta(hours=2, minutes=5),
+        clicked_at=anchor - timedelta(minutes=5),
     )
 
     page = await client.get(f"/s/{data['code']}")
